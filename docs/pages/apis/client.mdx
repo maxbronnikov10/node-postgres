@@ -57,6 +57,44 @@ const client = new Client()
 await client.connect()
 ```
 
+## client.batch
+
+`client.batch(queries: Array<string | QueryConfig>, callback?: Function) => Promise<Result[]> | void`
+
+Executes a group of parameterized statements with one protocol synchronization point.
+Call it on an idle JavaScript client after awaiting `BEGIN`. Results retain the order,
+rows, fields and row counts of the input queries. A callback receives `(err, results)`
+instead of a returned Promise. This API also works with `pipeline: false`.
+
+```js
+await client.query('BEGIN')
+try {
+  const results = await client.batch([
+    { text: 'UPDATE accounts SET balance = balance - $1 WHERE id = $2', values: [100, 1] },
+    { text: 'UPDATE accounts SET balance = balance + $1 WHERE id = $2 RETURNING balance', values: [100, 2] },
+  ])
+  await client.query('COMMIT')
+  console.log(results[1].rows)
+} catch (err) {
+  await client.query('ROLLBACK')
+  throw err
+}
+```
+
+A batch does not commit or roll back the transaction. On error, later unsent or
+server-skipped commands do not produce results; the batch rejects with the original
+error and its zero-based `batchIndex` (when the original error object is extensible). Roll back the transaction or an earlier
+savepoint before continuing after a server error. A local parameter-encoding error
+can occur after earlier commands have executed, so it also requires caller recovery.
+Successful completion confirms the statements, not a transaction commit.
+
+Each entry must contain one statement. COPY, cursor/portal options, per-entry callbacks
+and per-entry timeouts are unsupported. COPY terminates the connection rather than
+leaving it in an unusable protocol state. Keep transaction control outside the batch.
+Client-level `query_timeout` applies to the whole batch. Input and returned rows are
+held in memory; choose batch sizes accordingly. Outgoing messages are encoded in
+bounded chunks and wait for socket drain before encoding more.
+
 ## client.pipeline
 
 `client.pipeline: boolean` (read-only)

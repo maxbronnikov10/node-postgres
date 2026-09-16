@@ -6,6 +6,7 @@ const TypeOverrides = require('./type-overrides')
 
 const ConnectionParameters = require('./connection-parameters')
 const Query = require('./query')
+const Batch = require('./batch')
 const defaults = require('./defaults')
 const Connection = require('./connection')
 const crypto = require('./crypto/utils')
@@ -644,6 +645,9 @@ class Client extends EventEmitter {
     if (!this._connected || !this._queryable) {
       return
     }
+    // A batch may be waiting for socket drain before writing its final Sync.
+    // Keep later queries behind that boundary.
+    if (this._activeQuery instanceof Batch) return
     while (this._queryQueue.length > 0) {
       const query = this._queryQueue.shift()
       this.hasExecuted = true
@@ -655,6 +659,7 @@ class Client extends EventEmitter {
         continue
       }
       this._sentQueryQueue.push(query)
+      if (query instanceof Batch) break
     }
     if (this.readyForQuery && !this._activeQuery && this._sentQueryQueue.length > 0) {
       this._activeQuery = this._sentQueryQueue.shift()
@@ -663,6 +668,32 @@ class Client extends EventEmitter {
     if (!this._activeQuery && this._sentQueryQueue.length === 0 && this._queryQueue.length === 0 && this.hasExecuted) {
       this.emit('drain')
     }
+  }
+
+  batch(configs, callback) {
+    let result
+    if (callback === undefined) {
+      result = new this._Promise((resolve, reject) => {
+        callback = (err, results) => (err ? reject(err) : resolve(results))
+      })
+    } else if (typeof callback !== 'function') {
+      throw new TypeError('callback is not a function')
+    }
+    let batch
+    try {
+      if (!Array.isArray(configs) || configs.length === 0) {
+        throw new TypeError('A batch must be a non-empty array of queries')
+      }
+      if (!this.readyForQuery || this._txStatus !== 'T' || this._queryQueue.length || this._sentQueryQueue.length) {
+        throw new Error('A batch requires an idle client inside an explicit transaction')
+      }
+      batch = new Batch(configs, this._types, this.binary, callback)
+    } catch (err) {
+      process.nextTick(() => callback(err))
+      return result
+    }
+    this.query(batch)
+    return result
   }
 
   query(config, values, callback) {
