@@ -3,7 +3,7 @@
 const defaults = require('./defaults')
 const nodeUtils = require('util')
 
-const { isDate } = require('util/types')
+const { isDate, isProxy } = require('util/types')
 
 const invalidDateDeprecationNotice = nodeUtils.deprecate(
   () => {},
@@ -153,8 +153,12 @@ function dateToStringUTC(date) {
 
 function normalizeQueryConfig(config, values, callback) {
   // can take in strings or config objects
-  // Copy config so normalization does not mutate the caller's object.
-  config = typeof config === 'string' ? { text: config } : cloneQueryConfig(config)
+  if (typeof config === 'string') {
+    config = { text: config }
+  } else if (values !== undefined || callback !== undefined || !isOrdinaryQueryConfig(config)) {
+    // Copy config before applying positional values/callback so normalization does not mutate the caller's object.
+    config = cloneQueryConfig(config)
+  }
   if (values) {
     if (typeof values === 'function') {
       config.callback = values
@@ -166,6 +170,25 @@ function normalizeQueryConfig(config, values, callback) {
     config.callback = callback
   }
   return config
+}
+
+function isOrdinaryQueryConfig(config) {
+  if (
+    config == null ||
+    typeof config !== 'object' ||
+    isProxy(config) ||
+    Object.getPrototypeOf(config) !== Object.prototype
+  ) {
+    return false
+  }
+
+  for (const key of Reflect.ownKeys(config)) {
+    const descriptor = Object.getOwnPropertyDescriptor(config, key)
+    if (!('value' in descriptor) || !descriptor.enumerable || !descriptor.writable || !descriptor.configurable) {
+      return false
+    }
+  }
+  return true
 }
 
 function cloneQueryConfig(config) {
