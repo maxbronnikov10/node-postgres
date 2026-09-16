@@ -99,6 +99,8 @@ class Client extends EventEmitter {
     this._queryQueue = []
     this._sentQueryQueue = []
     this.pipeline = Boolean(c.pipeline)
+    this.pipelineBatchWrites = this.pipeline && Boolean(c.pipelineBatchWrites)
+    this._pipelineWritePending = false
     this.binary = c.binary || defaults.binary
     this.processID = null
     this.secretKey = null
@@ -644,6 +646,9 @@ class Client extends EventEmitter {
     if (!this._connected || !this._queryable) {
       return
     }
+    if (this._queryQueue.length > 0) {
+      this._startPipelineWriteBatch()
+    }
     while (this._queryQueue.length > 0) {
       const query = this._queryQueue.shift()
       this.hasExecuted = true
@@ -663,6 +668,26 @@ class Client extends EventEmitter {
     if (!this._activeQuery && this._sentQueryQueue.length === 0 && this._queryQueue.length === 0 && this.hasExecuted) {
       this.emit('drain')
     }
+  }
+
+  _startPipelineWriteBatch() {
+    if (this._pipelineWritePending || !this.pipelineBatchWrites) {
+      return
+    }
+
+    const stream = this.connection.stream
+    if (!stream || typeof stream.cork !== 'function' || typeof stream.uncork !== 'function') {
+      return
+    }
+
+    // Keep writes issued during this synchronous pipeline submission turn together. The
+    // next-tick boundary bounds the batch without adding a timer to each query.
+    stream.cork()
+    this._pipelineWritePending = true
+    process.nextTick(() => {
+      this._pipelineWritePending = false
+      stream.uncork()
+    })
   }
 
   query(config, values, callback) {

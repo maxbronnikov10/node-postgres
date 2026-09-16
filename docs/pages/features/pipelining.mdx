@@ -44,6 +44,19 @@ await client.end()
 
 All query types work with pipelining: plain text, parameterized, and named prepared statements.
 
+## Coalescing pipeline writes
+
+Pipelined queries can opt into stream write coalescing for queries submitted during the same synchronous turn:
+
+```js
+const client = new Client({ pipeline: true, pipelineBatchWrites: true })
+```
+
+`pipelineBatchWrites` defaults to `false` and is ignored unless `pipeline` is enabled. Coalescing delays the stream
+flush until the next event-loop turn, so it is useful for synchronous batches such as `Promise.all([...])`. The query
+order and per-query `Sync` error boundaries stay unchanged. Streams without `cork()`/`uncork()` continue to work and
+send writes individually.
+
 ## Pipelining with a pool
 
 Pass `pipeline: true` in the pool config to enable it on every client the pool creates:

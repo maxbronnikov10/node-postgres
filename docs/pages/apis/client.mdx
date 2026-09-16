@@ -31,6 +31,7 @@ type Config = {
   fallback_application_name?: string, // provide an application name to use if application_name is not set
   options?: string, // command-line options to be sent to the server
   pipeline?: boolean // when true, enables query pipelining. See /features/pipelining for details. Default false.
+  pipelineBatchWrites?: boolean // when true with pipeline, coalesces writes from the same turn. Default false.
 }
 ```
 
@@ -65,6 +66,19 @@ Whether this client has pipelining enabled. Set via the `pipeline` config option
 
 ```js
 const client = new Client({ pipeline: true })
+await client.connect()
+```
+
+## client.pipelineBatchWrites
+
+`client.pipelineBatchWrites: boolean` (read-only)
+
+Whether this client coalesces writes issued during the same synchronous turn when pipelining is enabled. Set via
+`pipelineBatchWrites: true` together with `pipeline: true`. Defaults to `false` and has no effect without pipelining.
+Each pipelined query still sends its own `Sync` message.
+
+```js
+const client = new Client({ pipeline: true, pipelineBatchWrites: true })
 await client.connect()
 ```
 
