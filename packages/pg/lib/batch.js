@@ -10,6 +10,30 @@ const describe = serialize.describe({ type: 'P', name: '' })
 // A batch owns one Sync and one queue entry. Individual Query objects retain
 // normal row parsing and Result semantics, but never submit their own Sync.
 class Batch extends Query {
+  static fromQueries(queries) {
+    const batch = new Batch([], null, false, (err) => {
+      for (let i = 0; i < queries.length; i++) {
+        if (i < batch._index) {
+          queries[i].handleReadyForQuery(batch.connection)
+        } else if (i === batch._queryError?.batchIndex) {
+          queries[i].handleError(batch._queryError, batch.connection)
+        } else if (i === err.batchIndex) {
+          queries[i].handleError(err, batch.connection)
+        } else {
+          const skipped = new Error('Query skipped because another query in the batch failed')
+          skipped.code = 'PG_BATCH_ABORTED'
+          skipped.cause = err
+          queries[i].handleError(skipped, batch.connection)
+        }
+      }
+    })
+    batch.queries = queries
+    batch._individualQueries = true
+    batch._results = queries.map((query) => query._result)
+    batch._setCurrent()
+    return batch
+  }
+
   constructor(configs, types, binary, callback) {
     super({ callback })
     this.queries = Array.from(configs, (config) => {
@@ -49,10 +73,14 @@ class Batch extends Query {
 
   submit(connection) {
     const names = Object.assign(Object.create(null), connection.parsedStatements, connection.submittedNamedStatements)
-    for (const query of this.queries) {
+    for (let i = 0; i < this.queries.length; i++) {
+      const query = this.queries[i]
       if (query.name) {
         if (query.text && names[query.name] && query.text !== names[query.name]) {
-          return new Error(`Prepared statements must be unique - '${query.name}' was used for a different statement`)
+          return this._annotate(
+            new Error(`Prepared statements must be unique - '${query.name}' was used for a different statement`),
+            i
+          )
         }
         names[query.name] = query.text || names[query.name]
       }
@@ -142,7 +170,7 @@ class Batch extends Query {
   }
 
   handleEmptyQuery() {
-    if (this.current._canceledDueToError && !this._canceledDueToError) {
+    if (!this._individualQueries && this.current._canceledDueToError && !this._canceledDueToError) {
       this._canceledDueToError = this._annotate(this.current._canceledDueToError, this._index)
     }
     this._index++
@@ -164,7 +192,8 @@ class Batch extends Query {
     this._sync()
     this._clearPendingNames()
     if (this.connection) this.connection.removeListener('copyOutResponse', this._copyError)
-    super.handleError(this._annotate(err, this._index), connection)
+    this._queryError = this._annotate(err, this._index)
+    super.handleError(this._queryError, connection)
   }
 }
 

@@ -100,6 +100,7 @@ class Client extends EventEmitter {
     this._queryQueue = []
     this._sentQueryQueue = []
     this.pipeline = Boolean(c.pipeline)
+    this.autoBatch = this.pipeline && Boolean(c.autoBatch)
     this.binary = c.binary || defaults.binary
     this.processID = null
     this.secretKey = null
@@ -615,6 +616,28 @@ class Client extends EventEmitter {
   }
 
   _pulseQueryQueue() {
+    if (
+      this.autoBatch &&
+      this.readyForQuery &&
+      this._txStatus === 'T' &&
+      this._sentQueryQueue.length === 0 &&
+      this._queryQueue[0]?._autoBatch
+    ) {
+      if (!this._batchScheduled) {
+        this._batchScheduled = true
+        process.nextTick(() => {
+          this._batchScheduled = false
+          let count = 0
+          while (this._queryQueue[count]?._autoBatch) count++
+          if (count > 1) {
+            const queries = this._queryQueue.splice(0, count)
+            this._queryQueue.unshift(Batch.fromQueries(queries))
+          }
+          this._pulsePipelinedQueryQueue()
+        })
+      }
+      return
+    }
     if (this.pipeline) {
       this._pulsePipelinedQueryQueue()
       return
@@ -773,6 +796,22 @@ class Client extends EventEmitter {
 
     if (query._result && !query._result._types) {
       query._result._types = this._types
+    }
+
+    // Keep transaction control, simple multi-statement SQL and custom query
+    // classes on their existing paths. Timed queries retain their own boundary.
+    if (
+      this.autoBatch &&
+      !readTimeout &&
+      typeof config.submit !== 'function' &&
+      !query.rows &&
+      !query.portal &&
+      typeof query.text === 'string' &&
+      (!query.values || Array.isArray(query.values)) &&
+      query.requiresPreparation() &&
+      /^\s*(SELECT|INSERT|UPDATE|DELETE|MERGE|WITH)\b/i.test(query.text)
+    ) {
+      query._autoBatch = true
     }
 
     // A query that keeps a portal open across round trips cannot share a pipelined connection: the
