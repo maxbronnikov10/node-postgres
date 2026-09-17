@@ -404,6 +404,11 @@ class Pool extends EventEmitter {
       return this._remove(client, this._pulseQueue.bind(this))
     }
 
+    if (this._pendingQueue.length) {
+      client.ref && client.ref()
+      return this._acquireClient(client, this._pendingQueue.shift(), idleListener, false)
+    }
+
     // idle timeout
     let tid
     if (this.options.idleTimeoutMillis && this._isAboveMin()) {
