@@ -143,9 +143,11 @@ queries share its checked-out connection:
 
 ```js
 import { DataSource } from 'typeorm'
+import pg from 'pg'
 
 const dataSource = new DataSource({
   type: 'postgres',
+  driver: { ...pg }, // select the JavaScript driver even when pg-native is installed
   url: process.env.DATABASE_URL,
   extra: { pipeline: true, autoBatch: true },
 })
