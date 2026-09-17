@@ -5,6 +5,29 @@ const Query = helper.pg.Query
 const assert = require('assert')
 const suite = new helper.Suite()
 
+for (const pipeline of [false, true]) {
+  suite.test(`unnamed queries ignore named statement cache (pipeline=${pipeline})`, async function () {
+    const client = new helper.pg.Client({ pipeline })
+    await client.connect()
+    try {
+      for (const name of [undefined, null]) {
+        const results = await Promise.all([
+          client.query({ name: String(name), text: 'SELECT $1::int AS value', values: [1] }),
+          client.query({ name, text: 'SELECT 2 AS value' }),
+        ])
+        assert.deepEqual(
+          results.map((result) => result.rows),
+          [[{ value: 1 }], [{ value: 2 }]]
+        )
+        const result = await client.query({ name, text: 'SELECT 3 AS value' })
+        assert.deepEqual(result.rows, [{ value: 3 }])
+      }
+    } finally {
+      await client.end()
+    }
+  })
+}
+
 ;(function () {
   const queryName = 'user by age and like name'
 

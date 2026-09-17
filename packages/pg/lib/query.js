@@ -153,7 +153,8 @@ class Query extends EventEmitter {
     if (typeof this.text !== 'string' && typeof this.name !== 'string') {
       return new Error('A query must have either text or a name. Supplying neither is unsupported.')
     }
-    const previous = connection.parsedStatements[this.name] || connection.submittedNamedStatements[this.name]
+    const previous =
+      this.name && (connection.parsedStatements[this.name] || connection.submittedNamedStatements[this.name])
     if (this.text && previous && this.text !== previous) {
       return new Error(`Prepared statements must be unique - '${this.name}' was used for a different statement`)
     }
