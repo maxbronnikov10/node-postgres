@@ -6,6 +6,7 @@ const utils = require('./utils')
 
 const execute = serialize.execute({})
 const describe = serialize.describe({ type: 'P', name: '' })
+const hasOwn = Object.prototype.hasOwnProperty
 
 // A batch owns one Sync and one queue entry. Individual Query objects retain
 // normal row parsing and Result semantics, but never submit their own Sync.
@@ -72,17 +73,26 @@ class Batch extends Query {
   }
 
   submit(connection) {
-    const names = Object.assign(Object.create(null), connection.parsedStatements, connection.submittedNamedStatements)
+    let names
     for (let i = 0; i < this.queries.length; i++) {
       const query = this.queries[i]
       if (query.name) {
-        if (query.text && names[query.name] && query.text !== names[query.name]) {
+        const name = query.name
+        if (!names) names = Object.create(null)
+        const previous = hasOwn.call(names, name)
+          ? names[name]
+          : connection.submittedNamedStatements && hasOwn.call(connection.submittedNamedStatements, name)
+          ? connection.submittedNamedStatements[name]
+          : connection.parsedStatements && hasOwn.call(connection.parsedStatements, name)
+          ? connection.parsedStatements[name]
+          : undefined
+        if (query.text && previous && query.text !== previous) {
           return this._annotate(
-            new Error(`Prepared statements must be unique - '${query.name}' was used for a different statement`),
+            new Error(`Prepared statements must be unique - '${name}' was used for a different statement`),
             i
           )
         }
-        names[query.name] = query.text || names[query.name]
+        names[name] = query.text || previous
       }
     }
     this.connection = connection
