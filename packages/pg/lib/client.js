@@ -99,6 +99,14 @@ class Client extends EventEmitter {
     this._queryQueue = []
     this._sentQueryQueue = []
     this.pipeline = Boolean(c.pipeline)
+    this._maxAutoPrepare = c.maxAutoPrepare ?? 0
+    if (!Number.isSafeInteger(this._maxAutoPrepare) || this._maxAutoPrepare < 0) {
+      throw new TypeError('maxAutoPrepare must be a non-negative safe integer')
+    }
+    if (this._maxAutoPrepare) {
+      this._autoPreparedStatements = new Map()
+      this._autoPreparePrefix = 'pg_auto_' + crypto.randomBytes(12).toString('hex') + '_'
+    }
     this.binary = c.binary || defaults.binary
     this.processID = null
     this.secretKey = null
@@ -685,6 +693,25 @@ class Client extends EventEmitter {
       }
     } else {
       query = new Query(config, values, callback)
+      if (
+        this._maxAutoPrepare &&
+        !query.name &&
+        !query.rows &&
+        !query.portal &&
+        !query.types &&
+        Array.isArray(query.values) &&
+        query.values.length > 0 &&
+        typeof query.text === 'string' &&
+        /^\s*(SELECT|INSERT|UPDATE|DELETE|MERGE|WITH)\b/i.test(query.text)
+      ) {
+        let name = this._autoPreparedStatements.get(query.text)
+        if (!name && this._autoPreparedStatements.size < this._maxAutoPrepare) {
+          name = this._autoPreparePrefix + this._autoPreparedStatements.size
+          // ponytail: retain the first N SQL texts; eviction needs ordered Close handling in pipelines.
+          this._autoPreparedStatements.set(query.text, name)
+        }
+        query.name = name
+      }
       if (!query.callback) {
         result = new this._Promise((resolve, reject) => {
           query.callback = (err, res) => (err ? reject(err) : resolve(res))

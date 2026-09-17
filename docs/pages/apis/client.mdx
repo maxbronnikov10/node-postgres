@@ -31,6 +31,7 @@ type Config = {
   fallback_application_name?: string, // provide an application name to use if application_name is not set
   options?: string, // command-line options to be sent to the server
   pipeline?: boolean // when true, enables query pipelining. See /features/pipelining for details. Default false.
+  maxAutoPrepare?: number // maximum automatically named SQL texts per connection; default 0 (disabled)
 }
 ```
 

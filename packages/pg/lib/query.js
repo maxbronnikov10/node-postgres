@@ -231,11 +231,13 @@ class Query extends EventEmitter {
         valueMapper: utils.prepareValue,
       })
     } catch (err) {
-      // we should close parse to avoid leaking connections
-      connection.close({ type: 'S', name: this.name })
+      // Keep named statements reusable, including earlier queries still in the pipeline.
+      if (!this.name) {
+        connection.close({ type: 'S', name: this.name })
+      }
       connection.sync()
 
-      this.handleError(err, connection)
+      this._canceledDueToError = err
       return
     }
 

@@ -105,6 +105,45 @@ Be careful not to fall into the trap of premature optimization.  Most of your qu
   </div>
 </div>
 
+### Automatic prepared statements
+
+Set `maxAutoPrepare` on a JavaScript `Client` or `Pool` to reuse prepared statements with ordinary
+`query(text, values)` calls. It defaults to `0` (disabled) and must be a non-negative safe integer.
+
+```js
+const pool = new Pool({ maxAutoPrepare: 100, pipeline: true })
+```
+
+TypeORM forwards this setting through `extra`, so transaction queries need no named-query wrapper:
+
+```js
+import pg from 'pg'
+
+const dataSource = new DataSource({
+  type: 'postgres',
+  driver: { ...pg }, // select the JavaScript driver even when pg-native is installed
+  // ...connection options
+  extra: { pipeline: true, maxAutoPrepare: 100 },
+})
+
+await dataSource.transaction(async (manager) => {
+  await Promise.all(ids.map((id) => manager.query('UPDATE accounts SET visits = visits + 1 WHERE id = $1', [id])))
+})
+```
+
+Each physical connection retains the first `maxAutoPrepare` distinct eligible SQL texts. Later new
+texts use the usual unnamed path; existing entries continue to be reused. There is no eviction or
+retry. A pool of 20 connections with a limit of 100 can retain up to 2,000 automatic statements.
+Use a limit suited to a stable set of repeated queries, and measure with representative parameters:
+PostgreSQL may choose a generic plan that performs differently from a parameter-specific plan.
+
+Only parameterized queries starting with `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `MERGE`, or `WITH`
+(ignoring whitespace) qualify. Explicit names, custom query objects, per-query `types`, cursors,
+named portals, and SQL with leading comments keep their existing behavior. Native bindings are not
+supported. As with manually named queries, do not remove cached statements with `DEALLOCATE` or
+`DISCARD ALL`; recycle the connection instead. A proxy must support protocol-level named statements
+for the pooling mode in use.
+
 ### Row mode
 
 By default node-postgres reads rows and collects them into JavaScript objects with the keys matching the column names and the values matching the corresponding row value for each column. If you do not need or do not want this behavior you can pass `rowMode: 'array'` to a query object. This will inform the result parser to bypass collecting rows into a JavaScript object, and instead will return each row as an array of values.
