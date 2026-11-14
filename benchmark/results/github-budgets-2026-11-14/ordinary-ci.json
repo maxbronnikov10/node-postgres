@@ -1,0 +1,91 @@
+{
+  "runId": 43645702048,
+  "sourceCommit": "fdba8c23136b567a9d8b9245736595ab95268997",
+  "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048",
+  "jobs": [
+    {
+      "name": "lint",
+      "id": 132602864437,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132602864437"
+    },
+    {
+      "name": "Node.js 16 x PostgreSQL 18",
+      "id": 132603181541,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132603181541"
+    },
+    {
+      "name": "Node.js 24 x PostgreSQL 18",
+      "id": 132603181549,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132603181549"
+    },
+    {
+      "name": "Node.js 22 x PostgreSQL 18",
+      "id": 132603181571,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132603181571"
+    },
+    {
+      "name": "Node.js 20 x PostgreSQL 18",
+      "id": 132603181579,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132603181579"
+    },
+    {
+      "name": "Node.js 18 x PostgreSQL 18",
+      "id": 132603181580,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132603181580"
+    },
+    {
+      "name": "Node.js 26 x PostgreSQL 14",
+      "id": 132603181582,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132603181582"
+    },
+    {
+      "name": "Node.js 26 x PostgreSQL 17",
+      "id": 132603181593,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132603181593"
+    },
+    {
+      "name": "Node.js 26 x PostgreSQL 13",
+      "id": 132603181595,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132603181595"
+    },
+    {
+      "name": "Node.js 26 x PostgreSQL 18",
+      "id": 132603181605,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132603181605"
+    },
+    {
+      "name": "Node.js 26 x PostgreSQL 15",
+      "id": 132603181632,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132603181632"
+    },
+    {
+      "name": "Node.js 26 x PostgreSQL 16",
+      "id": 132603181703,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43645702048/job/132603181703"
+    }
+  ]
+}

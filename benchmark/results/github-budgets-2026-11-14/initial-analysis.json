@@ -1,0 +1,173 @@
+[
+  {
+    "trial": 1,
+    "cpu": "AMD EPYC 7763 64-Core Processor",
+    "cores": 4,
+    "phases": [
+      {
+        "name": "overhead-point",
+        "baseQps": 13883.795406050724,
+        "headQps": 13472.527961649655,
+        "ratio": 0.9773009995401427,
+        "noisePct": 2.0817755346772437,
+        "range": [0.9622455486260177, 0.9929216884447907],
+        "notable": true,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-rows",
+        "baseQps": 2864.0357953581997,
+        "headQps": 2785.733937017155,
+        "ratio": 0.9743612662315241,
+        "noisePct": 5.855374450770723,
+        "range": [0.9311660309704066, 1.0009022521067086],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-update",
+        "baseQps": 6463.895202671832,
+        "headQps": 6472.677395509151,
+        "ratio": 1.0017153999473236,
+        "noisePct": 2.4637911173835625,
+        "range": [0.9899701798389915, 1.0136015149837654],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "pgbouncer-concurrent",
+        "baseQps": 510.7667028045406,
+        "headQps": 1850.0275187687148,
+        "ratio": 3.622064193968116,
+        "noisePct": 1.6202882381191497,
+        "range": [3.60775474614328, 3.672462191496016],
+        "notable": true,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "pgbouncer-large-payload",
+        "baseQps": 125.31631772482314,
+        "headQps": 127.89385452005357,
+        "ratio": 1.0157635859593874,
+        "noisePct": 10.87163471070054,
+        "range": [0.9874776653241851, 1.0426475494124867],
+        "notable": false,
+        "quality": "inconclusive: controls exceed 10%"
+      }
+    ]
+  },
+  {
+    "trial": 2,
+    "cpu": "Intel(R) Xeon(R) 6975P-C",
+    "cores": 4,
+    "phases": [
+      {
+        "name": "overhead-point",
+        "baseQps": 47129.11222254676,
+        "headQps": 46984.001660482485,
+        "ratio": 0.9981093741537761,
+        "noisePct": 5.9504495550605,
+        "range": [0.9331413238467249, 1.0258357241772167],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-rows",
+        "baseQps": 5373.778765061201,
+        "headQps": 5211.151596938964,
+        "ratio": 0.9714501508146032,
+        "noisePct": 3.4093463793499534,
+        "range": [0.9498803578060375, 0.9921021253120629],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-update",
+        "baseQps": 14102.443701347273,
+        "headQps": 14012.88784326968,
+        "ratio": 0.9938288483352131,
+        "noisePct": 3.0730725777475376,
+        "range": [0.9708665738727378, 1.0138159532440725],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "pgbouncer-concurrent",
+        "baseQps": 516.3945886534427,
+        "headQps": 2173.1864731828837,
+        "ratio": 4.2050235784194125,
+        "noisePct": 10.099875468973107,
+        "range": [3.9122562958651814, 4.287488582123118],
+        "notable": true,
+        "quality": "inconclusive: controls exceed 10%"
+      },
+      {
+        "name": "pgbouncer-large-payload",
+        "baseQps": 394.13087321148146,
+        "headQps": 396.4823666111698,
+        "ratio": 1.0057709384286388,
+        "noisePct": 1.3834536680487175,
+        "range": [0.993187445356661, 1.0139245261391554],
+        "notable": false,
+        "quality": "within 10% control band"
+      }
+    ]
+  },
+  {
+    "trial": 3,
+    "cpu": "Intel(R) Xeon(R) 6975P-C",
+    "cores": 4,
+    "phases": [
+      {
+        "name": "overhead-point",
+        "baseQps": 47302.735962286024,
+        "headQps": 46087.93218500986,
+        "ratio": 0.978069848310342,
+        "noisePct": 6.513139312762561,
+        "range": [0.9592829120267007, 1.0671406391870317],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-rows",
+        "baseQps": 5521.857171126925,
+        "headQps": 5130.562799091096,
+        "ratio": 0.9279220371266188,
+        "noisePct": 2.1173564690783575,
+        "range": [0.9168261891376505, 0.9477856971605471],
+        "notable": true,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-update",
+        "baseQps": 14208.997381113575,
+        "headQps": 14234.031270016298,
+        "ratio": 1.0004711263713575,
+        "noisePct": 2.740635683429593,
+        "range": [0.9901782251462017, 1.0143728947124724],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "pgbouncer-concurrent",
+        "baseQps": 524.2805600633544,
+        "headQps": 2176.510496572254,
+        "ratio": 4.144304030088921,
+        "noisePct": 4.71524458103354,
+        "range": [3.9127758426670574, 4.314455760996617],
+        "notable": true,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "pgbouncer-large-payload",
+        "baseQps": 379.918974885648,
+        "headQps": 381.3347174524181,
+        "ratio": 0.9994073051837002,
+        "noisePct": 3.0905367955360363,
+        "range": [0.988928310378088, 1.0202055086362247],
+        "notable": false,
+        "quality": "within 10% control band"
+      }
+    ]
+  }
+]

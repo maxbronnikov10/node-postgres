@@ -1,0 +1,104 @@
+{
+  "initialRun": 43642582872,
+  "initialHarness": "5397f14258c679cb5dc8afee09c1649dfaef4dda",
+  "initialCandidate": "7315ebb06c486343659f787fa23828fc74972679",
+  "initialCandidateTree": "98a75ab9088d625c7ffc2b38b5968d0b1b62875b",
+  "initialCI": 43640726022,
+  "optimizedLocal": "f7012989a2a25dcf6a9a1aa6f76d34f72c8b8fef",
+  "optimizedCandidate": "fdba8c23136b567a9d8b9245736595ab95268997",
+  "optimizedCandidateTree": "949c25bace8cdb54e6aadef02cb82b66b1fa49b5",
+  "optimizedCI": 43645702048,
+  "optimizedHarness": "0f656277251331c3539286345a720f99cecc6a40",
+  "optimizedHarnessTree": "7fe5c409d5454531d2a2ce39a146f465d47431ad",
+  "optimizedRun": 43646613495,
+  "beforeResults": "2550426b2bcb0664d12aaeccbd1493be609e47dc",
+  "beforeTls": "c0022e4fc848848656e74bdb2ada47ef9267bc9c",
+  "beforeTlsLocal": "b54455de279a6ead4a91a2ba5cd7249d1a693a24",
+  "initialArtifacts": [
+    {
+      "id": 14133441188,
+      "name": "reproducible-trial-3-1",
+      "sha256": "5273b58e559b94718c563e0b61adfcc47eef442e90b8e8345cfe98ed5a5c6378",
+      "sizeInBytes": 19570
+    },
+    {
+      "id": 14133067443,
+      "name": "reproducible-trial-1-1",
+      "sha256": "22477bce419e2d8d2f5777f30f559d3b59b7618ec1481ec93982cb548068a5bd",
+      "sizeInBytes": 19641
+    },
+    {
+      "id": 14132647008,
+      "name": "reproducible-regressions-1",
+      "sha256": "613fcc85c61b1c2ee7661897209b320f1a922f3aed3bfbbf278aaf809924f1c2",
+      "sizeInBytes": 50184
+    },
+    {
+      "id": 14132408952,
+      "name": "reproducible-trial-2-1",
+      "sha256": "dec6834caaa321f950d6e0b665ff4d0aa8a8ace9344c20565158a4f4209ef787",
+      "sizeInBytes": 19649
+    }
+  ],
+  "optimizedArtifacts": [
+    {
+      "id": 14135396543,
+      "name": "reproducible-trial-2-2",
+      "sha256": "ba1770dccf48ebc28eba92dca23f780b33ae85fa45ed66abe3e90a21ae0e958a",
+      "sizeInBytes": 23126
+    },
+    {
+      "id": 14134756132,
+      "name": "reproducible-regressions-1",
+      "sha256": "367cdfa286c4c07048a142cf75d97e80e21e9d0d91a25ed27f9a23887c16960f",
+      "sizeInBytes": 50218
+    },
+    {
+      "id": 14134329862,
+      "name": "reproducible-trial-3-1",
+      "sha256": "478d0fbc454f02a6389889fa22f4e1b41f3762b630a410280ef88a67dab311db",
+      "sizeInBytes": 23085
+    },
+    {
+      "id": 14133919501,
+      "name": "coordinated-packages-1",
+      "sha256": "695977823baff0d61f0a2239e4fcb27eb4aedfedef24c6759a97a31876d7fe53",
+      "sizeInBytes": 129896
+    },
+    {
+      "id": 14133674817,
+      "name": "reproducible-trial-1-1",
+      "sha256": "5f961c95fcf3b01f1c1f797410ebcda8749e9849a4e46447bd714e4bd932b6b7",
+      "sizeInBytes": 23239
+    }
+  ],
+  "optimizedJobIds": {
+    "regressions": 132605741217,
+    "packages": 132606320789,
+    "trial1": 132606320821,
+    "trial3": 132606320836,
+    "excludedTrial2Startup": 132606320786,
+    "retriedTrial2": 132609997150
+  },
+  "excluded": [
+    {
+      "runId": 43646613495,
+      "attempt": 1,
+      "jobId": 132606320786,
+      "phase": "Initialize containers",
+      "reason": "Docker failed to bind host port 32774: address already in use",
+      "measurementProduced": false,
+      "action": "Re-run only the failed job after the other jobs completed, same harness and runtime commits."
+    }
+  ],
+  "jsonCopies": "Repository copies may be formatted; complete JSON fields and sample values are preserved. Artifact SHA256 values refer to the original ZIP downloads.",
+  "resourceScope": "Standard public GitHub-hosted Ubuntu 24.04 runners. No student-credit activation and no npm registry publication.",
+  "finalRunConclusion": "success",
+  "finalRunAttempt": 2,
+  "trialAttempts": {
+    "1": 1,
+    "2": 2,
+    "3": 1
+  },
+  "initialHarnessTree": "182e5c5825d2271b8b46f7ac17134f54cb9bcb18"
+}

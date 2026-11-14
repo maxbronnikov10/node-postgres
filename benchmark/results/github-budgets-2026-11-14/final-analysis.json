@@ -1,0 +1,206 @@
+[
+  {
+    "trial": 1,
+    "attempt": 1,
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "cores": 4,
+    "phases": [
+      {
+        "name": "overhead-point",
+        "baseQps": 22156.041886752777,
+        "headQps": 21887.796827355625,
+        "ratio": 0.985616579267267,
+        "noisePct": 1.7145303262687372,
+        "range": [0.9744229497824439, 0.999907269401568],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-rows",
+        "baseQps": 4328.317550342302,
+        "headQps": 4201.265030545563,
+        "ratio": 0.9673028574997617,
+        "noisePct": 4.392926014336529,
+        "range": [0.9535827419106182, 0.9907566096694188],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "budget-context-bulk",
+        "baseQps": 4230.66182398325,
+        "headQps": 4215.617280007291,
+        "ratio": 0.9964474093146409,
+        "noisePct": 6.927845243041064,
+        "range": [0.9554339875290695, 1.0355195855448585],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-update",
+        "baseQps": 8421.341944284444,
+        "headQps": 8770.102676285806,
+        "ratio": 1.0245965018496466,
+        "noisePct": 30.711448173239898,
+        "range": [0.892054651123401, 1.2970958480061832],
+        "notable": false,
+        "quality": "inconclusive: controls exceed 10%"
+      },
+      {
+        "name": "pgbouncer-concurrent",
+        "baseQps": 520.2239507597249,
+        "headQps": 2043.8938872779695,
+        "ratio": 3.9232827849960685,
+        "noisePct": 3.477680244714265,
+        "range": [3.757397318491638, 4.112925437700028],
+        "notable": true,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "pgbouncer-large-payload",
+        "baseQps": 221.0047632736821,
+        "headQps": 221.56524498708836,
+        "ratio": 1.0019965613716688,
+        "noisePct": 3.2764232198484233,
+        "range": [0.9789229359459672, 1.006969802029801],
+        "notable": false,
+        "quality": "within 10% control band"
+      }
+    ]
+  },
+  {
+    "trial": 2,
+    "attempt": 2,
+    "cpu": "AMD EPYC 7763 64-Core Processor",
+    "cores": 4,
+    "phases": [
+      {
+        "name": "overhead-point",
+        "baseQps": 14240.238415344258,
+        "headQps": 13825.627088448942,
+        "ratio": 0.972683411932988,
+        "noisePct": 1.6089294983339442,
+        "range": [0.9679512008853516, 0.9798312980861285],
+        "notable": true,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-rows",
+        "baseQps": 2890.878471174071,
+        "headQps": 2760.4229629932584,
+        "ratio": 0.952445919310224,
+        "noisePct": 5.719169439307126,
+        "range": [0.9286004371766006, 0.9796141137202042],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "budget-context-bulk",
+        "baseQps": 2736.044780077754,
+        "headQps": 2753.434730895449,
+        "ratio": 0.9983116627348616,
+        "noisePct": 4.84817345953239,
+        "range": [0.9775017356855541, 1.0147016871137142],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-update",
+        "baseQps": 6502.261045093652,
+        "headQps": 6468.591194676263,
+        "ratio": 0.9944204979323126,
+        "noisePct": 2.0460576600807245,
+        "range": [0.9790262665015863, 1.0120244390194897],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "pgbouncer-concurrent",
+        "baseQps": 453.48490340193257,
+        "headQps": 1758.3850609712727,
+        "ratio": 3.86815467284283,
+        "noisePct": 1.813225189256884,
+        "range": [3.7612995349424847, 4.000697193562281],
+        "notable": true,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "pgbouncer-large-payload",
+        "baseQps": 131.5014327516907,
+        "headQps": 128.45442596323028,
+        "ratio": 0.9668820281104109,
+        "noisePct": 7.984923316031578,
+        "range": [0.9201018288172081, 1.0043549630547837],
+        "notable": false,
+        "quality": "within 10% control band"
+      }
+    ]
+  },
+  {
+    "trial": 3,
+    "attempt": 1,
+    "cpu": "Intel(R) Xeon(R) 6975P-C",
+    "cores": 4,
+    "phases": [
+      {
+        "name": "overhead-point",
+        "baseQps": 46546.58995615369,
+        "headQps": 45452.28260373225,
+        "ratio": 0.9818370336116964,
+        "noisePct": 6.42021290903797,
+        "range": [0.936370832923836, 1.0110736711890234],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-rows",
+        "baseQps": 5569.254391442017,
+        "headQps": 5322.727708840355,
+        "ratio": 0.959676445086107,
+        "noisePct": 3.738868321505129,
+        "range": [0.9392576357781494, 0.9787897200673705],
+        "notable": true,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "budget-context-bulk",
+        "baseQps": 5277.154061669076,
+        "headQps": 5277.079563126734,
+        "ratio": 0.997805249122836,
+        "noisePct": 3.5385803120401293,
+        "range": [0.9732797195806057, 1.037854030437456],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "overhead-update",
+        "baseQps": 14384.297210210347,
+        "headQps": 14234.182634551387,
+        "ratio": 0.9990182725233947,
+        "noisePct": 3.1507763386465104,
+        "range": [0.9766580723980951, 1.003402200309325],
+        "notable": false,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "pgbouncer-concurrent",
+        "baseQps": 540.4722802740533,
+        "headQps": 2210.6971823316244,
+        "ratio": 4.0960932603296,
+        "noisePct": 0.6318254041630333,
+        "range": [3.856557123723874, 4.2865285940932685],
+        "notable": true,
+        "quality": "within 10% control band"
+      },
+      {
+        "name": "pgbouncer-large-payload",
+        "baseQps": 405.82858909109586,
+        "headQps": 403.725820815449,
+        "ratio": 0.9980940537294339,
+        "noisePct": 1.3655581120703975,
+        "range": [0.9836111282450922, 1.0022315720576254],
+        "notable": false,
+        "quality": "within 10% control band"
+      }
+    ]
+  }
+]

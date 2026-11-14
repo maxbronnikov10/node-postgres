@@ -1,0 +1,19 @@
+{
+  "runId": 43646613495,
+  "jobId": 132606320789,
+  "jobUrl": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43646613495/job/132606320789",
+  "sourceCommit": "fdba8c23136b567a9d8b9245736595ab95268997",
+  "sourceTree": "949c25bace8cdb54e6aadef02cb82b66b1fa49b5",
+  "conclusion": "success",
+  "assertionLog": [
+    "2026-11-14T22:13:14.6532418Z All eight tarballs are byte-reproducible",
+    "2026-11-14T22:13:15.3447607Z PASS: isolated versions, no source links, CJS/ESM, executor recovery, binary int4, cursor, query-stream",
+    "2026-11-14T22:13:28.4114743Z PASS optional native packaged consumer"
+  ],
+  "checks": {
+    "repeatedArchives": 8,
+    "jsPackagesInFreshConsumer": 7,
+    "optionalNativeFreshInstall": true
+  },
+  "limits": "Native Client checked separately; QueryExecutor is JavaScript only. No installed Cloudflare runtime check. No npm registry publication."
+}
