@@ -11,6 +11,14 @@ export class BufferReader {
     this.buffer = buffer
   }
 
+  public getBuffer(): Buffer {
+    return this.buffer
+  }
+
+  public getOffset(): number {
+    return this.offset
+  }
+
   public int16(): number {
     const result = this.buffer.readInt16BE(this.offset)
     this.offset += 2

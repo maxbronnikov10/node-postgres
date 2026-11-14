@@ -44,6 +44,14 @@ await client.end()
 
 All query types work with pipelining: plain text, parameterized, and named prepared statements.
 
+## TLS writes
+
+On Node.js TLS streams, synchronous pipeline submissions are corked until the next
+Node.js tick so several queries can share an encrypted record. Each query retains
+its own Sync/error boundary, and socket backpressure still pauses further encoding.
+Full writable buffers are flushed immediately instead of waiting for that tick.
+This is automatic when pipelining is enabled; it adds no separate option.
+
 ## Pipelining with a pool
 
 Pass `pipeline: true` in the pool config to enable it on every client the pool creates:

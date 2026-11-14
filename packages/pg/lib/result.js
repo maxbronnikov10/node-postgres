@@ -1,6 +1,7 @@
 'use strict'
 
 const types = require('pg-types')
+const { ProtocolError } = require('pg-protocol')
 
 const matchRegexp = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/
 
@@ -20,6 +21,7 @@ class Result {
     this.rowAsArray = rowMode === 'array'
     if (this.rowAsArray) {
       this.parseRow = this._parseRowAsArray
+      this.parseRawRow = this._parseRawRowAsArray
     }
     this._prebuiltEmptyResultObject = null
   }
@@ -48,6 +50,7 @@ class Result {
   }
 
   _parseRowAsArray(rowData) {
+    this._assertFieldCount(rowData.length)
     const row = new Array(rowData.length)
     for (let i = 0, len = rowData.length; i < len; i++) {
       const rawValue = rowData[i]
@@ -61,6 +64,7 @@ class Result {
   }
 
   parseRow(rowData) {
+    this._assertFieldCount(rowData.length)
     const row = { ...this._prebuiltEmptyResultObject }
     for (let i = 0, len = rowData.length; i < len; i++) {
       const rawValue = rowData[i]
@@ -73,6 +77,54 @@ class Result {
       }
     }
     return row
+  }
+
+  _parseRawRowAsArray({ buffer, offset, fieldCount }) {
+    this._assertFieldCount(fieldCount)
+    const row = new Array(fieldCount)
+    offset += 2
+    for (let i = 0; i < fieldCount; i++) {
+      const length = buffer.readInt32BE(offset)
+      offset += 4
+      let value = null
+      if (length !== -1) {
+        const rawValue =
+          this.fields[i].format === 'binary'
+            ? buffer.subarray(offset, offset + length)
+            : buffer.toString('utf8', offset, offset + length)
+        value = this._parsers[i](rawValue)
+        offset += length
+      }
+      row[i] = value
+    }
+    return row
+  }
+
+  parseRawRow({ buffer, offset, fieldCount }) {
+    this._assertFieldCount(fieldCount)
+    const row = { ...this._prebuiltEmptyResultObject }
+    offset += 2
+    for (let i = 0; i < fieldCount; i++) {
+      const length = buffer.readInt32BE(offset)
+      offset += 4
+      let value = null
+      if (length !== -1) {
+        const rawValue =
+          this.fields[i].format === 'binary'
+            ? buffer.subarray(offset, offset + length)
+            : buffer.toString('utf8', offset, offset + length)
+        value = this._parsers[i](rawValue)
+        offset += length
+      }
+      row[this.fields[i].name] = value
+    }
+    return row
+  }
+
+  _assertFieldCount(fieldCount) {
+    if (fieldCount !== this.fields.length) {
+      throw new ProtocolError('DataRow field count does not match RowDescription')
+    }
   }
 
   addRow(row) {

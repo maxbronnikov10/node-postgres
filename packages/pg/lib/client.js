@@ -6,6 +6,7 @@ const TypeOverrides = require('./type-overrides')
 
 const ConnectionParameters = require('./connection-parameters')
 const Query = require('./query')
+const Batch = require('./batch')
 const defaults = require('./defaults')
 const Connection = require('./connection')
 const crypto = require('./crypto/utils')
@@ -99,6 +100,15 @@ class Client extends EventEmitter {
     this._queryQueue = []
     this._sentQueryQueue = []
     this.pipeline = Boolean(c.pipeline)
+    this.autoBatch = this.pipeline && Boolean(c.autoBatch)
+    this._maxAutoPrepare = c.maxAutoPrepare ?? 0
+    if (!Number.isSafeInteger(this._maxAutoPrepare) || this._maxAutoPrepare < 0) {
+      throw new TypeError('maxAutoPrepare must be a non-negative safe integer')
+    }
+    if (this._maxAutoPrepare) {
+      this._autoPreparedStatements = new Map()
+      this._autoPreparePrefix = 'pg_auto_' + crypto.randomBytes(12).toString('hex') + '_'
+    }
     this.binary = c.binary || defaults.binary
     this.processID = null
     this.secretKey = null
@@ -131,6 +141,10 @@ class Client extends EventEmitter {
   }
 
   _errorAllQueries(err) {
+    if (this._pipelineDrainListener) {
+      this.connection.stream.removeListener('drain', this._pipelineDrainListener)
+      this._pipelineDrainListener = null
+    }
     const enqueueError = (query) => {
       process.nextTick(() => {
         query.handleError(err, this.connection)
@@ -371,6 +385,7 @@ class Client extends EventEmitter {
   }
 
   _handleReadyForQuery(msg) {
+    this.connection.setDataRowMode?.('raw')
     if (this._connecting) {
       this._connecting = false
       this._connected = true
@@ -450,6 +465,9 @@ class Client extends EventEmitter {
     }
     // delegate rowDescription to active query
     activeQuery.handleRowDescription(msg)
+    this.connection.setDataRowMode?.(
+      activeQuery.constructor === Query && msg.fields.every((field) => field.format === 'text') ? 'text' : 'raw'
+    )
   }
 
   _handleDataRow(msg) {
@@ -614,6 +632,28 @@ class Client extends EventEmitter {
   }
 
   _pulseQueryQueue() {
+    if (
+      this.autoBatch &&
+      this.readyForQuery &&
+      this._txStatus === 'T' &&
+      this._sentQueryQueue.length === 0 &&
+      this._queryQueue[0]?._autoBatch
+    ) {
+      if (!this._batchScheduled) {
+        this._batchScheduled = true
+        process.nextTick(() => {
+          this._batchScheduled = false
+          let count = 0
+          while (this._queryQueue[count]?._autoBatch) count++
+          if (count > 1) {
+            const queries = this._queryQueue.splice(0, count)
+            this._queryQueue.unshift(Batch.fromQueries(queries))
+          }
+          this._pulsePipelinedQueryQueue()
+        })
+      }
+      return
+    }
     if (this.pipeline) {
       this._pulsePipelinedQueryQueue()
       return
@@ -644,7 +684,29 @@ class Client extends EventEmitter {
     if (!this._connected || !this._queryable) {
       return
     }
-    while (this._queryQueue.length > 0) {
+    // A batch may be waiting for socket drain before writing its final Sync.
+    // Keep later queries behind that boundary.
+    if (this._activeQuery instanceof Batch) return
+    const stream = this.connection.stream
+    if (
+      this._queryQueue.length &&
+      !this._pipelineDrainListener &&
+      !this._tlsWritePending &&
+      stream.encrypted === true &&
+      typeof stream.cork === 'function' &&
+      typeof stream.uncork === 'function'
+    ) {
+      // A TLS record can carry several queries while each keeps its own Sync boundary.
+      stream.cork()
+      const flush = () => {
+        if (this._tlsWritePending !== flush) return
+        this._tlsWritePending = null
+        stream.uncork()
+      }
+      this._tlsWritePending = flush
+      process.nextTick(flush)
+    }
+    while (!this._pipelineDrainListener && this._queryQueue.length > 0) {
       const query = this._queryQueue.shift()
       this.hasExecuted = true
       const queryError = query.submit(this.connection)
@@ -655,6 +717,16 @@ class Client extends EventEmitter {
         continue
       }
       this._sentQueryQueue.push(query)
+      // A full buffer should start draining immediately rather than wait for the batching tick.
+      if (stream.writableNeedDrain && this._tlsWritePending) this._tlsWritePending()
+      if (query instanceof Batch) break
+      if (this.connection.stream.writableNeedDrain) {
+        this._pipelineDrainListener = () => {
+          this._pipelineDrainListener = null
+          this._pulseQueryQueue()
+        }
+        this.connection.stream.once('drain', this._pipelineDrainListener)
+      }
     }
     if (this.readyForQuery && !this._activeQuery && this._sentQueryQueue.length > 0) {
       this._activeQuery = this._sentQueryQueue.shift()
@@ -663,6 +735,32 @@ class Client extends EventEmitter {
     if (!this._activeQuery && this._sentQueryQueue.length === 0 && this._queryQueue.length === 0 && this.hasExecuted) {
       this.emit('drain')
     }
+  }
+
+  batch(configs, callback) {
+    let result
+    if (callback === undefined) {
+      result = new this._Promise((resolve, reject) => {
+        callback = (err, results) => (err ? reject(err) : resolve(results))
+      })
+    } else if (typeof callback !== 'function') {
+      throw new TypeError('callback is not a function')
+    }
+    let batch
+    try {
+      if (!Array.isArray(configs) || configs.length === 0) {
+        throw new TypeError('A batch must be a non-empty array of queries')
+      }
+      if (!this.readyForQuery || this._txStatus !== 'T' || this._queryQueue.length || this._sentQueryQueue.length) {
+        throw new Error('A batch requires an idle client inside an explicit transaction')
+      }
+      batch = new Batch(configs, this._types, this.binary, callback)
+    } catch (err) {
+      process.nextTick(() => callback(err))
+      return result
+    }
+    this.query(batch)
+    return result
   }
 
   query(config, values, callback) {
@@ -685,13 +783,36 @@ class Client extends EventEmitter {
       }
     } else {
       query = new Query(config, values, callback)
+      if (
+        this._maxAutoPrepare &&
+        !query.name &&
+        !query.rows &&
+        !query.portal &&
+        !query.types &&
+        Array.isArray(query.values) &&
+        query.values.length > 0 &&
+        typeof query.text === 'string' &&
+        /^\s*(SELECT|INSERT|UPDATE|DELETE|MERGE|WITH)\b/i.test(query.text)
+      ) {
+        let name = this._autoPreparedStatements.get(query.text)
+        if (!name && this._autoPreparedStatements.size < this._maxAutoPrepare) {
+          name = this._autoPreparePrefix + this._autoPreparedStatements.size
+          // ponytail: retain the first N SQL texts; eviction needs ordered Close handling in pipelines.
+          this._autoPreparedStatements.set(query.text, name)
+        }
+        query.name = name
+      }
       if (!query.callback) {
         result = new this._Promise((resolve, reject) => {
           query.callback = (err, res) => (err ? reject(err) : resolve(res))
         }).catch((err) => {
           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
           // application that created the query
-          Error.captureStackTrace(err)
+          try {
+            Error.captureStackTrace(err)
+          } catch {
+            // Optional stack rewriting must preserve the original error.
+          }
           throw err
         })
       } else if (typeof query.callback !== 'function') {
@@ -742,6 +863,22 @@ class Client extends EventEmitter {
 
     if (query._result && !query._result._types) {
       query._result._types = this._types
+    }
+
+    // Keep transaction control, simple multi-statement SQL and custom query
+    // classes on their existing paths. Timed queries retain their own boundary.
+    if (
+      this.autoBatch &&
+      !readTimeout &&
+      typeof config.submit !== 'function' &&
+      !query.rows &&
+      !query.portal &&
+      typeof query.text === 'string' &&
+      (!query.values || Array.isArray(query.values)) &&
+      query.requiresPreparation() &&
+      /^\s*(SELECT|INSERT|UPDATE|DELETE|MERGE|WITH)\b/i.test(query.text)
+    ) {
+      query._autoBatch = true
     }
 
     // A query that keeps a portal open across round trips cannot share a pipelined connection: the

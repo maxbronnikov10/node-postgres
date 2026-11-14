@@ -1,0 +1,75 @@
+{
+  "revision": "eb4e4dc9cfae8ed63510b153d51aca59b1d05263",
+  "endpoint": "PostgreSQL18.7, verified TLS1.3, relay3ms/direction",
+  "max": 4,
+  "depth": 16,
+  "maxPending": 64,
+  "trials": [
+    {
+      "arm": "QueryExecutor",
+      "offeredPerSecond": 20000,
+      "offeredSeconds": 5,
+      "offered": 100000,
+      "generationMillis": 5000.88608,
+      "completedAtWindowEnd": 21761,
+      "completed": 21866,
+      "rejected": 78134,
+      "errors": {
+        "PG_EXECUTOR_OVERLOADED/not-sent": 78134
+      },
+      "drainMillis": 19.576592999999775,
+      "successLatency": {
+        "count": 21866,
+        "p50Millis": 28.607,
+        "p95Millis": 45.631,
+        "p99Millis": 59.231,
+        "maxMillis": 74.687
+      },
+      "rejectionLatency": {
+        "count": 78134,
+        "p50Millis": 1.706,
+        "p95Millis": 6.183,
+        "p99Millis": 11.391,
+        "maxMillis": 22.399
+      },
+      "peakWaiting": 64,
+      "peakInFlight": 64,
+      "observedHeapGrowthBytes": 21838672,
+      "eventLoopP99Millis": 16.859135,
+      "trial": 1
+    },
+    {
+      "arm": "QueryExecutor",
+      "offeredPerSecond": 20000,
+      "offeredSeconds": 5,
+      "offered": 100000,
+      "generationMillis": 5000.778405,
+      "completedAtWindowEnd": 24283,
+      "completed": 24411,
+      "rejected": 75589,
+      "errors": {
+        "PG_EXECUTOR_OVERLOADED/not-sent": 75589
+      },
+      "drainMillis": 17.64580500000011,
+      "successLatency": {
+        "count": 24411,
+        "p50Millis": 26.287,
+        "p95Millis": 35.807,
+        "p99Millis": 40.927,
+        "maxMillis": 45.567
+      },
+      "rejectionLatency": {
+        "count": 75589,
+        "p50Millis": 1.459,
+        "p95Millis": 3.649,
+        "p99Millis": 5.279,
+        "maxMillis": 11.167
+      },
+      "peakWaiting": 64,
+      "peakInFlight": 64,
+      "observedHeapGrowthBytes": 22428616,
+      "eventLoopP99Millis": 14.630911,
+      "trial": 2
+    }
+  ]
+}

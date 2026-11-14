@@ -1,0 +1,33 @@
+{
+  "postgres": {
+    "version": "PostgreSQL 18.7 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "fsync": "on",
+    "full_page_writes": "on",
+    "synchronous_commit": "on"
+  },
+  "pgbouncer": {
+    "version": [
+      {
+        "version": "PgBouncer 1.25.2"
+      }
+    ],
+    "config": {
+      "pool_mode": "transaction",
+      "default_pool_size": "4",
+      "max_prepared_statements": "200",
+      "client_tls_sslmode": "require",
+      "server_tls_sslmode": "verify-full"
+    },
+    "servers": [
+      {
+        "database": "nodepg_survey",
+        "tls": "TLSv1.3/TLS_AES_256_GCM_SHA384"
+      }
+    ]
+  },
+  "frontendTls": {
+    "authorized": true,
+    "version": "TLSv1.3",
+    "alpn": "postgresql"
+  }
+}

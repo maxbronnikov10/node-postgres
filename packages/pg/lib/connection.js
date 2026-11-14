@@ -2,7 +2,7 @@
 
 const EventEmitter = require('events').EventEmitter
 
-const { parse, serialize } = require('pg-protocol')
+const { parseRaw, serialize } = require('pg-protocol')
 const stream = require('./stream')
 const { getStream } = stream
 
@@ -23,8 +23,8 @@ class Connection extends EventEmitter {
 
     this._keepAlive = config.keepAlive
     this._keepAliveInitialDelayMillis = config.keepAliveInitialDelayMillis
-    this.parsedStatements = {}
-    this.submittedNamedStatements = {}
+    this.parsedStatements = Object.create(null)
+    this.submittedNamedStatements = Object.create(null)
     this.ssl = config.ssl || false
     this.sslNegotiation = config.sslNegotiation || 'postgres'
     this._ending = false
@@ -120,7 +120,7 @@ class Connection extends EventEmitter {
 
     // SNI must not be set to an IP address (RFC 6066 section 3)
     const net = require('net')
-    if (net.isIP && net.isIP(host) === 0) {
+    if (options.servername === undefined && net.isIP && net.isIP(host) === 0) {
       options.servername = host
     }
     try {
@@ -135,13 +135,17 @@ class Connection extends EventEmitter {
   }
 
   attachListeners(stream) {
-    parse(stream, (msg) => {
+    this._parser = parseRaw(stream, (msg) => {
       const eventName = msg.name === 'error' ? 'errorMessage' : msg.name
       if (this._emitMessage) {
         this.emit('message', msg)
       }
       this.emit(eventName, msg)
     })
+  }
+
+  setDataRowMode(mode) {
+    if (this._parser) this._parser.setDataRowMode(mode)
   }
 
   requestSsl() {

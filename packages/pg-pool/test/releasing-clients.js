@@ -1,8 +1,50 @@
+const EventEmitter = require('events')
 const Pool = require('../')
 
 const expect = require('expect.js')
 
 describe('releasing clients', () => {
+  it('hands a released client to pending requests in FIFO order', async () => {
+    let unrefs = 0
+    class FakeClient extends EventEmitter {
+      connect(callback) {
+        this._queryable = true
+        callback()
+      }
+      end(callback) {
+        callback && callback()
+      }
+      ref() {}
+      unref() {
+        unrefs++
+      }
+    }
+    const pool = new Pool({ Client: FakeClient, allowExitOnIdle: true, max: 1 })
+    const events = []
+    pool.on('acquire', () => events.push('acquire'))
+    pool.on('release', () => events.push('release'))
+    const client = await pool.connect()
+    const first = pool.connect()
+    const second = pool.connect()
+    expect(pool.waitingCount).to.equal(2)
+
+    client.release()
+    const next = await first
+    expect(next).to.equal(client)
+    expect(pool.waitingCount).to.equal(1)
+    expect(pool.idleCount).to.equal(0)
+    next.release()
+    const last = await second
+    expect(last).to.equal(client)
+    expect(pool.waitingCount).to.equal(0)
+    expect(pool.idleCount).to.equal(0)
+    expect(unrefs).to.equal(0)
+    expect(events).to.eql(['acquire', 'release', 'acquire', 'release', 'acquire'])
+
+    last.release()
+    await pool.end()
+  })
+
   it('removes a client which cannot be queried', async () => {
     // make a pool w/ only 1 client
     const pool = new Pool({ max: 1 })

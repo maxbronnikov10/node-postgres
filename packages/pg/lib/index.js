@@ -9,6 +9,7 @@ const Pool = require('pg-pool')
 const TypeOverrides = require('./type-overrides')
 const { DatabaseError } = require('pg-protocol')
 const { escapeIdentifier, escapeLiteral } = require('./utils')
+const { QueryExecutor, QueryExecutorError } = require('./query-executor')
 
 const poolFactory = (Client) => {
   return class BoundPool extends Pool {
@@ -23,6 +24,10 @@ const PG = function (clientConstructor) {
   this.Client = clientConstructor
   this.Query = this.Client.Query
   this.Pool = poolFactory(this.Client)
+  if (clientConstructor === Client) {
+    this.QueryExecutor = QueryExecutor
+    this.QueryExecutorError = QueryExecutorError
+  }
   this._pools = []
   this.Connection = Connection
   this.types = require('pg-types')

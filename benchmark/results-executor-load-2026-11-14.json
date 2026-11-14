@@ -1,0 +1,134 @@
+{
+  "revision": "eb4e4dc9cfae8ed63510b153d51aca59b1d05263",
+  "node": "v22.22.1",
+  "endpoint": "PostgreSQL 18.7, verified TLS1.3, opaque relay3ms/direction",
+  "max": 4,
+  "depth": 16,
+  "maxPending": 64,
+  "trials": [
+    {
+      "arm": "Pool.query",
+      "offeredPerSecond": 1000,
+      "offeredSeconds": 5,
+      "offered": 5000,
+      "generationMillis": 4999.59818,
+      "completedAtWindowEnd": 2224,
+      "completed": 5000,
+      "rejected": 0,
+      "errors": {},
+      "drainMillis": 5794.5870209999985,
+      "successLatency": {
+        "count": 5000,
+        "p50Millis": 3065.855,
+        "p95Millis": 5484.543,
+        "p99Millis": 5734.399,
+        "maxMillis": 5795.839
+      },
+      "rejectionLatency": {
+        "count": 0,
+        "p50Millis": 0,
+        "p95Millis": 0,
+        "p99Millis": 0,
+        "maxMillis": 0
+      },
+      "peakWaiting": 2772,
+      "peakInFlight": 4,
+      "observedHeapGrowthBytes": 20846176,
+      "eventLoopP99Millis": 11.337727,
+      "trial": 1
+    },
+    {
+      "arm": "QueryExecutor",
+      "offeredPerSecond": 1000,
+      "offeredSeconds": 5,
+      "offered": 5000,
+      "generationMillis": 4999.356529,
+      "completedAtWindowEnd": 4991,
+      "completed": 5000,
+      "rejected": 0,
+      "errors": {},
+      "drainMillis": 9.191886999999952,
+      "successLatency": {
+        "count": 5000,
+        "p50Millis": 9.439,
+        "p95Millis": 11.511,
+        "p99Millis": 13.023,
+        "maxMillis": 16.047
+      },
+      "rejectionLatency": {
+        "count": 0,
+        "p50Millis": 0,
+        "p95Millis": 0,
+        "p99Millis": 0,
+        "maxMillis": 0
+      },
+      "peakWaiting": 0,
+      "peakInFlight": 16,
+      "observedHeapGrowthBytes": 11277240,
+      "eventLoopP99Millis": 11.051007,
+      "trial": 2
+    },
+    {
+      "arm": "QueryExecutor",
+      "offeredPerSecond": 1000,
+      "offeredSeconds": 5,
+      "offered": 5000,
+      "generationMillis": 5000.224757,
+      "completedAtWindowEnd": 4991,
+      "completed": 5000,
+      "rejected": 0,
+      "errors": {},
+      "drainMillis": 7.630043999999543,
+      "successLatency": {
+        "count": 5000,
+        "p50Millis": 9.455,
+        "p95Millis": 11.031,
+        "p99Millis": 12.407,
+        "maxMillis": 17.119
+      },
+      "rejectionLatency": {
+        "count": 0,
+        "p50Millis": 0,
+        "p95Millis": 0,
+        "p99Millis": 0,
+        "maxMillis": 0
+      },
+      "peakWaiting": 0,
+      "peakInFlight": 17,
+      "observedHeapGrowthBytes": 11315016,
+      "eventLoopP99Millis": 10.985471,
+      "trial": 3
+    },
+    {
+      "arm": "Pool.query",
+      "offeredPerSecond": 1000,
+      "offeredSeconds": 5,
+      "offered": 5000,
+      "generationMillis": 4999.404371,
+      "completedAtWindowEnd": 2266,
+      "completed": 5000,
+      "rejected": 0,
+      "errors": {},
+      "drainMillis": 5644.499359,
+      "successLatency": {
+        "count": 5000,
+        "p50Millis": 2969.599,
+        "p95Millis": 5406.719,
+        "p99Millis": 5595.135,
+        "maxMillis": 5648.383
+      },
+      "rejectionLatency": {
+        "count": 0,
+        "p50Millis": 0,
+        "p95Millis": 0,
+        "p99Millis": 0,
+        "maxMillis": 0
+      },
+      "peakWaiting": 2730,
+      "peakInFlight": 4,
+      "observedHeapGrowthBytes": 20814584,
+      "eventLoopP99Millis": 11.108351,
+      "trial": 4
+    }
+  ]
+}

@@ -33,6 +33,70 @@ test('normalizing query configs', function () {
   assert.deepEqual(config, { text: 'TEXT', values: [10], callback: callback })
 })
 
+test('normalizeQueryConfig reuses ordinary data-only configs without positional overrides', function () {
+  const original = { text: 'TEXT' }
+
+  assert.strictEqual(utils.normalizeQueryConfig(original), original)
+})
+
+test('normalizeQueryConfig preserves proxy descriptor semantics', function () {
+  let prototypeReads = 0
+  const original = new Proxy(
+    { text: 'TEXT' },
+    {
+      get: function () {
+        return 'INTERCEPTED'
+      },
+      getPrototypeOf: function () {
+        prototypeReads++
+        return Object.prototype
+      },
+    }
+  )
+  assert.equal(utils.normalizeQueryConfig(original).text, 'TEXT')
+  assert.equal(prototypeReads, 1)
+})
+
+test('normalizeQueryConfig preserves accessor getter receiver', function () {
+  let getterReceiver
+  const original = { _text: 'TEXT' }
+  Object.defineProperty(original, 'text', {
+    configurable: true,
+    enumerable: true,
+    get: function () {
+      getterReceiver = this
+      return this._text
+    },
+  })
+
+  const normalized = utils.normalizeQueryConfig(original)
+
+  assert.notStrictEqual(normalized, original)
+  assert.strictEqual(normalized.text, 'TEXT')
+  assert.strictEqual(getterReceiver, normalized)
+})
+
+test('normalizeQueryConfig preserves non-enumerable config properties', function () {
+  const original = { text: 'TEXT' }
+  Object.defineProperty(original, 'hidden', {
+    configurable: true,
+    enumerable: false,
+    value: 'hidden',
+    writable: true,
+  })
+
+  const normalized = utils.normalizeQueryConfig(original)
+
+  assert.notStrictEqual(normalized, original)
+  assert.strictEqual(normalized.hidden, 'hidden')
+  assert.deepEqual(Object.getOwnPropertyDescriptor(normalized, 'hidden'), {
+    configurable: true,
+    enumerable: false,
+    value: 'hidden',
+    writable: true,
+  })
+})
+
 test('normalizeQueryConfig does not mutate the passed-in config object', function () {
   // Regression test for https://github.com/brianc/node-postgres/issues/2651.
   const original = { text: 'TEXT' }
@@ -63,6 +127,7 @@ test('normalizeQueryConfig preserves inherited config properties', function () {
 
   assert.equal(original.callback, undefined)
   assert.equal(original.values, undefined)
+  assert.strictEqual(Object.getPrototypeOf(normalized), Object.getPrototypeOf(original))
   assert.equal(normalized.text, 'TEXT')
   assert.deepEqual(normalized.values, [10])
   assert.equal(normalized.callback, callback)

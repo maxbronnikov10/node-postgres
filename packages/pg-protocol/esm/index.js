@@ -3,9 +3,11 @@ import * as protocol from '../dist/index.js'
 
 // Re-export all the properties
 export const DatabaseError = protocol.DatabaseError
+export const ProtocolError = protocol.ProtocolError
 export const SASL = protocol.SASL
 export const serialize = protocol.serialize
 export const parse = protocol.parse
+export const parseRaw = protocol.parseRaw
 
 // Re-export the default
 export default protocol

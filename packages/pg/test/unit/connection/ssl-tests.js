@@ -68,6 +68,68 @@ suite.test(
   }
 )
 
+const explicitServernameCases = [
+  {
+    host: 'alias.example.net',
+    servername: 'localhost',
+    sni: 'localhost',
+    why: 'the certificate identity can differ from the DNS host',
+  },
+  { host: 'localhost', servername: '', sni: false, why: 'an empty servername explicitly disables SNI' },
+]
+for (const { host, servername, sni, why } of explicitServernameCases) {
+  suite.test(`TLS preserves explicit servername ${JSON.stringify(servername)}: ${why}`, async function () {
+    const tlsDir = path.join(__dirname, '..', '..', 'tls')
+    const server = tls.createServer({
+      key: fs.readFileSync(path.join(tlsDir, 'test-server.key')),
+      cert: fs.readFileSync(path.join(tlsDir, 'test-server.crt')),
+      ALPNProtocols: ['postgresql'],
+    })
+    let serverSocket
+    server.once('connection', (socket) => {
+      serverSocket = socket
+    })
+    const socket = new net.Socket()
+    socket.connect = function (port) {
+      return net.Socket.prototype.connect.call(this, port, '127.0.0.1')
+    }
+    const con = new Connection({
+      stream: socket,
+      sslNegotiation: 'direct',
+      ssl: { ca: fs.readFileSync(path.join(tlsDir, 'test-server-ca.crt')), servername },
+    })
+    let timeout
+    try {
+      await new Promise((resolve, reject) => {
+        server.once('error', reject)
+        server.listen(0, '127.0.0.1', resolve)
+      })
+      const accepted = new Promise((resolve, reject) => {
+        server.once('secureConnection', resolve)
+        server.once('tlsClientError', reject)
+      })
+      const connected = new Promise((resolve, reject) => {
+        con.once('error', reject)
+        con.once('sslconnect', () => con.stream.once('secureConnect', resolve))
+      })
+      const expired = new Promise((resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error('TLS handshake timed out')), 2000)
+      })
+
+      con.connect(server.address().port, host)
+      const [secureSocket] = await Promise.race([Promise.all([accepted, connected]), expired])
+
+      assert.equal(con.stream.authorized, true)
+      assert.equal(secureSocket.servername, sni)
+    } finally {
+      clearTimeout(timeout)
+      con.stream.destroy()
+      serverSocket?.destroy()
+      await new Promise((resolve) => server.close(resolve))
+    }
+  })
+}
+
 suite.test('TLS verifies the server certificate against the IP address being connected to', function (done) {
   const tlsDir = path.join(__dirname, '..', '..', 'tls')
   const serverKey = fs.readFileSync(path.join(tlsDir, 'test-server.key'))

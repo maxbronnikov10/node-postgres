@@ -1,0 +1,800 @@
+{
+  "runtimeRevisions": {
+    "validatedText": "6bf1dec5",
+    "tlsIdentity": "e7fbae09",
+    "queryExecutor": "8fb79c29"
+  },
+  "benchmarkRevision": "eb4e4dc9cfae8ed63510b153d51aca59b1d05263",
+  "pgUnitCases": 324,
+  "pgIntegrationCases": 325,
+  "otherCases": {
+    "protocol": 104,
+    "pool": 93,
+    "cursor": 43,
+    "query-stream": 40,
+    "worker": 3,
+    "tls": 0,
+    "benchmark-check": 0,
+    "delay-check": 0,
+    "native-callback-api-tests.js": 2,
+    "native-evented-api-tests.js": 8,
+    "native-native-connection-string-tests.js": 2,
+    "native-native-vs-js-error-tests.js": 0,
+    "native-stress-tests.js": 3
+  },
+  "totalReportedCases": 947,
+  "pgFiles": [
+    {
+      "file": "test/integration/client/api-tests.js",
+      "exit": 0,
+      "cases": 14,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/appname-tests.js",
+      "exit": 0,
+      "cases": 6,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/array-tests.js",
+      "exit": 0,
+      "cases": 14,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/async-stack-trace-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/auto-batch-tests.js",
+      "exit": 0,
+      "cases": 7,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/auto-prepare-tests.js",
+      "exit": 0,
+      "cases": 5,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/batch-tests.js",
+      "exit": 0,
+      "cases": 10,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/big-simple-query-tests.js",
+      "exit": 0,
+      "cases": 4,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/combined-optimizations-tests.js",
+      "exit": 0,
+      "cases": 5,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/configuration-tests.js",
+      "exit": 0,
+      "cases": 4,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/connection-parameter-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/connection-timeout-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/custom-types-tests.js",
+      "exit": 0,
+      "cases": 3,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/empty-query-tests.js",
+      "exit": 0,
+      "cases": 3,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/error-handling-tests.js",
+      "exit": 0,
+      "cases": 15,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/error-identity-tests.js",
+      "exit": 0,
+      "cases": 25,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/field-name-escape-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/huge-numeric-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/idle_in_transaction_session_timeout-tests.js",
+      "exit": 0,
+      "cases": 4,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/json-type-parsing-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/multiple-results-tests.js",
+      "exit": 0,
+      "cases": 4,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/network-partition-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/no-data-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/no-row-result-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/notice-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/optimization-semantics-tests.js",
+      "exit": 0,
+      "cases": 7,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/parse-int-8-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/pipeline-portal-tests.js",
+      "exit": 0,
+      "cases": 4,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/pipelining-tests.js",
+      "exit": 0,
+      "cases": 9,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/prepared-statement-tests.js",
+      "exit": 0,
+      "cases": 12,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/promise-api-tests.js",
+      "exit": 0,
+      "cases": 3,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/query-as-promise-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/query-column-names-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/query-error-handling-prepared-statement-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/query-error-handling-tests.js",
+      "exit": 0,
+      "cases": 3,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/query-executor-tests.js",
+      "exit": 0,
+      "cases": 27,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/quick-disconnect-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/raw-row-tests.js",
+      "exit": 0,
+      "cases": 5,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/result-metadata-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/results-as-array-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/row-description-on-results-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/sasl-scram-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/simple-query-tests.js",
+      "exit": 0,
+      "cases": 7,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/ssl-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/statement_timeout-tests.js",
+      "exit": 0,
+      "cases": 5,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/timezone-tests.js",
+      "exit": 0,
+      "cases": 3,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/transaction-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/txstatus-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/type-coercion-tests.js",
+      "exit": 0,
+      "cases": 16,
+      "failed": false
+    },
+    {
+      "file": "test/integration/client/type-parser-override-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/connection-pool/connection-pool-size-tests.js",
+      "exit": 0,
+      "cases": 4,
+      "failed": false
+    },
+    {
+      "file": "test/integration/connection-pool/error-tests.js",
+      "exit": 0,
+      "cases": 5,
+      "failed": false
+    },
+    {
+      "file": "test/integration/connection-pool/idle-timeout-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/connection-pool/native-instance-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/connection-pool/tls-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/connection-pool/yield-support-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/domain-tests.js",
+      "exit": 0,
+      "cases": 3,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/1105-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/130-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/131-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/1382-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/1542-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/1854-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/199-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/1992-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2056-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2064-tests.js",
+      "exit": 0,
+      "cases": 3,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2079-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2085-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2108-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2303-tests.js",
+      "exit": 0,
+      "cases": 5,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2307-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2416-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2556-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2627-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2716-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/2862-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/3062-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/3174-tests.js",
+      "exit": 0,
+      "cases": 24,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/3487-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/3772-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/507-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/600-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/675-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/699-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/787-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/882-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/integration/gh-issues/981-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/batch-tests.js",
+      "exit": 0,
+      "cases": 7,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/cleartext-password-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/configuration-tests.js",
+      "exit": 0,
+      "cases": 12,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/early-disconnect-tests.js",
+      "exit": 0,
+      "cases": 0,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/escape-tests.js",
+      "exit": 0,
+      "cases": 48,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/md5-password-tests.js",
+      "exit": 0,
+      "cases": 4,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/notification-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/password-callback-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/pipeline-backpressure-tests.js",
+      "exit": 0,
+      "cases": 11,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/prepared-statement-tests.js",
+      "exit": 0,
+      "cases": 11,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/query-queue-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/query-timeout-tests.js",
+      "exit": 0,
+      "cases": 2,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/raw-row-tests.js",
+      "exit": 0,
+      "cases": 13,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/result-metadata-tests.js",
+      "exit": 0,
+      "cases": 7,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/sasl-scram-tests.js",
+      "exit": 0,
+      "cases": 34,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/set-keepalives-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/simple-query-tests.js",
+      "exit": 0,
+      "cases": 29,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/stream-and-query-error-interaction-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/throw-in-bind-tests.js",
+      "exit": 0,
+      "cases": 3,
+      "failed": false
+    },
+    {
+      "file": "test/unit/client/throw-in-type-parser-tests.js",
+      "exit": 0,
+      "cases": 3,
+      "failed": false
+    },
+    {
+      "file": "test/unit/connection-parameters/creation-tests.js",
+      "exit": 0,
+      "cases": 30,
+      "failed": false
+    },
+    {
+      "file": "test/unit/connection-parameters/environment-variable-tests.js",
+      "exit": 0,
+      "cases": 13,
+      "failed": false
+    },
+    {
+      "file": "test/unit/connection-pool/configuration-tests.js",
+      "exit": 0,
+      "cases": 1,
+      "failed": false
+    },
+    {
+      "file": "test/unit/connection/error-tests.js",
+      "exit": 0,
+      "cases": 11,
+      "failed": false
+    },
+    {
+      "file": "test/unit/connection/ssl-tests.js",
+      "exit": 0,
+      "cases": 5,
+      "failed": false
+    },
+    {
+      "file": "test/unit/connection/startup-tests.js",
+      "exit": 0,
+      "cases": 8,
+      "failed": false
+    },
+    {
+      "file": "test/unit/result-tests.js",
+      "exit": 0,
+      "cases": 7,
+      "failed": false
+    },
+    {
+      "file": "test/unit/utils-tests.js",
+      "exit": 0,
+      "cases": 57,
+      "failed": false
+    }
+  ],
+  "packageChecks": [
+    {
+      "name": "protocol",
+      "exit": 0,
+      "cases": 104
+    },
+    {
+      "name": "pool",
+      "exit": 0,
+      "cases": 93
+    },
+    {
+      "name": "cursor",
+      "exit": 0,
+      "cases": 43
+    },
+    {
+      "name": "query-stream",
+      "exit": 0,
+      "cases": 40
+    },
+    {
+      "name": "worker",
+      "exit": 0,
+      "cases": 3
+    },
+    {
+      "name": "tls",
+      "exit": 0,
+      "cases": 0
+    },
+    {
+      "name": "benchmark-check",
+      "exit": 0,
+      "cases": 0
+    },
+    {
+      "name": "delay-check",
+      "exit": 0,
+      "cases": 0
+    },
+    {
+      "name": "native-callback-api-tests.js",
+      "exit": 0,
+      "cases": 2
+    },
+    {
+      "name": "native-evented-api-tests.js",
+      "exit": 0,
+      "cases": 8
+    },
+    {
+      "name": "native-native-connection-string-tests.js",
+      "exit": 0,
+      "cases": 2
+    },
+    {
+      "name": "native-native-vs-js-error-tests.js",
+      "exit": 0,
+      "cases": 0
+    },
+    {
+      "name": "native-stress-tests.js",
+      "exit": 0,
+      "cases": 3
+    }
+  ],
+  "notes": [
+    "One pre-existing pending pool case",
+    "Optional SCRAM roles not configured",
+    "Build and lint passed",
+    "CommonJS/ESM exports and native isolation passed",
+    "Real TLS PostgreSQL/PgBouncer checks passed after all measurements",
+    "Actual workerd Client compatibility: 3 passed; new QueryExecutor was not exercised in workerd",
+    "Scripts with direct assertions are additional to the reported case count"
+  ]
+}

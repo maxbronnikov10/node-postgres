@@ -115,7 +115,7 @@ class Cursor extends EventEmitter {
   }
 
   handleDataRow(msg) {
-    const row = this._result.parseRow(msg.fields)
+    const row = msg.buffer ? this._result.parseRawRow(msg) : this._result.parseRow(msg.fields)
     this.emit('row', row, this._result)
     this._rows.push(row)
   }

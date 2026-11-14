@@ -182,7 +182,11 @@ Client.prototype.query = function (config, values, callback) {
         resolveOut = resolve
         rejectOut = reject
       }).catch((err) => {
-        Error.captureStackTrace(err)
+        try {
+          Error.captureStackTrace(err)
+        } catch {
+          // Optional stack rewriting must preserve the original error.
+        }
         throw err
       })
       query.callback = (err, res) => (err ? rejectOut(err) : resolveOut(res))

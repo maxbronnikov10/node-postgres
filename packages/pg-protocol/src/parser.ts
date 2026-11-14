@@ -18,6 +18,8 @@ import {
   ParameterDescriptionMessage,
   Field,
   DataRowMessage,
+  RawDataRowMessage,
+  ProtocolError,
   ParameterStatusMessage,
   BackendKeyDataMessage,
   DatabaseError,
@@ -47,7 +49,7 @@ export type Packet = {
 const emptyBuffer = Buffer.allocUnsafe(0)
 
 type StreamOptions = TransformOptions & {
-  mode: Mode
+  mode: Mode | 'raw'
 }
 
 const enum MessageCodes {
@@ -82,13 +84,18 @@ export class Parser {
   private bufferLength: number = 0
   private bufferOffset: number = 0
   private reader = new BufferReader()
-  private mode: Mode
+  private mode: Mode | 'raw'
+  private bufferShared = false
 
   constructor(opts?: StreamOptions) {
     if (opts?.mode === 'binary') {
       throw new Error('Binary mode not supported yet')
     }
     this.mode = opts?.mode || 'text'
+  }
+
+  public setDataRowMode(mode: 'text' | 'raw'): void {
+    this.mode = mode
   }
 
   public parse(buffer: Buffer, callback: MessageCallback) {
@@ -100,6 +107,7 @@ export class Parser {
       const code = this.buffer[offset]
       // length is 1 Uint32BE - it is the length of the message EXCLUDING the code
       const length = this.buffer.readUInt32BE(offset + CODE_LENGTH)
+      if (length < LEN_LENGTH) throw new ProtocolError('Message length is smaller than its header')
       const fullMessageLength = CODE_LENGTH + length
       if (fullMessageLength + offset <= bufferFullLength) {
         const message = this.handlePacket(offset + HEADER_LENGTH, code, length, this.buffer)
@@ -112,6 +120,7 @@ export class Parser {
     if (offset === bufferFullLength) {
       // No more use for the buffer
       this.buffer = emptyBuffer
+      this.bufferShared = false
       this.bufferLength = 0
       this.bufferOffset = 0
     } else {
@@ -128,7 +137,7 @@ export class Parser {
       if (newFullLength > this.buffer.byteLength) {
         // We can't concat the new buffer with the remaining one
         let newBuffer: Buffer
-        if (newLength <= this.buffer.byteLength && this.bufferOffset >= this.bufferLength) {
+        if (!this.bufferShared && newLength <= this.buffer.byteLength && this.bufferOffset >= this.bufferLength) {
           // We can move the relevant part to the beginning of the buffer instead of allocating a new buffer
           newBuffer = this.buffer
         } else {
@@ -138,6 +147,7 @@ export class Parser {
             newBufferLength *= 2
           }
           newBuffer = Buffer.allocUnsafe(newBufferLength)
+          this.bufferShared = false
         }
         // Move the remaining buffer to the new one
         this.buffer.copy(newBuffer, 0, this.bufferOffset, this.bufferOffset + this.bufferLength)
@@ -149,6 +159,7 @@ export class Parser {
       this.bufferLength = newLength
     } else {
       this.buffer = buffer
+      this.bufferShared = false
       this.bufferOffset = 0
       this.bufferLength = buffer.byteLength
     }
@@ -188,7 +199,12 @@ export class Parser {
         message = emptyQuery
         break
       case MessageCodes.DataRow:
-        message = parseDataRowMessage(reader)
+        if (this.mode === 'raw') {
+          message = new RawDataRowMessage(length, reader)
+          this.bufferShared = true
+        } else {
+          message = parseDataRowMessage(reader, length)
+        }
         break
       case MessageCodes.CommandComplete:
         message = parseCommandCompleteMessage(reader)
@@ -228,6 +244,7 @@ export class Parser {
         break
       case MessageCodes.CopyData:
         message = parseCopyData(reader, length)
+        this.bufferShared = true
         break
       default:
         return new DatabaseError('received invalid response: ' + code.toString(16), length, 'error')
@@ -306,14 +323,26 @@ const parseParameterDescriptionMessage = (reader: BufferReader) => {
   return message
 }
 
-const parseDataRowMessage = (reader: BufferReader) => {
-  const fieldCount = reader.int16()
-  const fields: any[] = new Array(fieldCount)
+const parseDataRowMessage = (reader: BufferReader, length: number) => {
+  const buffer = reader.getBuffer()
+  let offset = reader.getOffset()
+  const end = offset + length - LEN_LENGTH
+  if (offset + 2 > end) throw new ProtocolError('DataRow is missing its field count')
+  const fieldCount = buffer.readUInt16BE(offset)
+  offset += 2
+  if (fieldCount > (end - offset) / 4) throw new ProtocolError('DataRow is missing a field length')
+  const fields = new Array<string | null>(fieldCount)
   for (let i = 0; i < fieldCount; i++) {
-    const len = reader.int32()
-    // a -1 for length means the value of the field is null
-    fields[i] = len === -1 ? null : reader.string(len)
+    if (offset + 4 > end) throw new ProtocolError('DataRow is missing a field length')
+    const length = buffer.readInt32BE(offset)
+    offset += 4
+    if (length < -1 || (length >= 0 && length > end - offset)) {
+      throw new ProtocolError('DataRow field length is outside its payload')
+    }
+    fields[i] = length === -1 ? null : buffer.toString('utf8', offset, offset + length)
+    if (length !== -1) offset += length
   }
+  if (offset !== end) throw new ProtocolError('DataRow contains trailing bytes')
   return new DataRowMessage(LATEINIT_LENGTH, fields)
 }
 

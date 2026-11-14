@@ -4,6 +4,8 @@ import pg from '../lib/index.js'
 // Re-export all the properties
 export const Client = pg.Client
 export const Pool = pg.Pool
+export const QueryExecutor = pg.QueryExecutor
+export const QueryExecutorError = pg.QueryExecutorError
 export const Connection = pg.Connection
 export const types = pg.types
 export const Query = pg.Query

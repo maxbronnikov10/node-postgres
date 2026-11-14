@@ -1,0 +1,163 @@
+---
+title: pg.QueryExecutor
+---
+
+`QueryExecutor` runs concurrent independent SQL statements over a bounded set of
+JavaScript clients. Connections open lazily. Each connection pipelines queries,
+with a separate protocol synchronization boundary for each statement.
+
+```js
+import { QueryExecutor } from 'pg'
+
+const executor = new QueryExecutor({ max: 4, maxInFlightPerConnection: 16, maxPending: 1024 })
+
+try {
+  const results = await Promise.all(
+    [1, 2, 3].map((id) => executor.query('SELECT id, name FROM users WHERE id = $1', [id]))
+  )
+  console.log(results.map((result) => result.rows))
+} finally {
+  await executor.end()
+}
+```
+
+This API is available from the CommonJS and ESM JavaScript exports, together with
+`QueryExecutorError`. It is not part of `pg.native`. Construction requires a runtime
+providing `events.addAbortListener`; otherwise it throws `PG_EXECUTOR_UNSUPPORTED`.
+Ordinary `Client` and `Pool` do not acquire this requirement.
+
+## new QueryExecutor
+
+`new QueryExecutor(options?)`
+
+Accepts [Client connection options](/apis/client#new-client), including connection
+strings, TLS, type parsers and prepared-statement options, plus these limits:
+
+| Option                     | Default | Meaning                                                              |
+| -------------------------- | ------- | -------------------------------------------------------------------- |
+| `max`                      | `4`     | Maximum physical frontend connections, including connecting clients. |
+| `maxInFlightPerConnection` | `16`    | Maximum queries assigned to each connection.                         |
+| `maxPending`               | `1024`  | Maximum queries waiting for assignment.                              |
+| `query_timeout`            | `30000` | Query deadline in milliseconds, including queue and connection wait. |
+| `connectionTimeoutMillis`  | `5000`  | Timeout in milliseconds for each connection attempt.                 |
+
+Limits must be positive safe integers. Timeouts must be integers from `0` to
+`2147483647`; `0` disables that timeout. Invalid constructor options throw
+`QueryExecutorError` with code `PG_EXECUTOR_INVALID`.
+
+The executor manages `pipeline: true` and `autoBatch: false`. An explicit
+`pipeline: false` or enabled `autoBatch` is rejected. These defaults are starting
+points for application sizing, not universal throughput settings.
+
+The queue is FIFO; assignment chooses the least loaded ready client. These limits
+bound query counts, not payload bytes or result memory. Choose limits appropriate
+for the size of your parameters and results. An executor belongs to one JavaScript
+event loop; limits are not shared across workers or processes.
+
+TLS options retain normal certificate verification. An application may explicitly
+share `ssl.secureContext` between connections; see
+[TLS connection setup](/apis/client#tls-connection-setup). The executor creates no
+implicit TLS context or session cache. Direct TLS negotiation requires a compatible
+endpoint.
+
+With transaction-mode PgBouncer, named statements and `maxAutoPrepare` require
+compatible protocol prepared-statement tracking, including a nonzero
+`max_prepared_statements`. The executor does not make session-scoped SQL `PREPARE`
+safe for transaction pooling.
+
+## executor.query
+
+`executor.query(text, values?) => Promise<Result>`
+
+`executor.query(config) => Promise<Result>`
+
+Returns the usual [Result](/apis/result). Query configuration supports `text`,
+`values`, `name`, `binary`, `rowMode`, `types`, `query_timeout` and `signal`.
+`text` must be a nonempty string and `values`, when supplied, must be an array.
+The values array is copied without encoding parameters until assignment.
+
+Every query uses extended protocol and must contain a single SQL statement,
+including queries without parameters. An explicit `queryMode` must be `'extended'`.
+Callbacks, custom Query objects, portals, `rows` pagination and per-query transport
+options are unsupported.
+
+Statements must be independent: no transaction control, session `SET`, temporary
+table workflows, session locks, COPY or cursors. Use an exclusively checked-out
+[Pool client](/apis/pool#poolconnect) for these workflows. SQL is not parsed to
+prove independence. If a query leaves a transaction open, the executor discards
+that connection and rejects assigned work; this guard does not make session-dependent
+queries safe.
+
+### Deadlines and cancellation
+
+```js
+const controller = new AbortController()
+const result = await executor.query({
+  text: 'SELECT id FROM users WHERE email = $1',
+  values: ['reader@example.com'],
+  query_timeout: 5000,
+  signal: controller.signal,
+})
+```
+
+Per-query `query_timeout` overrides the executor default. Its deadline starts when
+`query()` is called and includes time spent queued or waiting for a connection;
+assignment does not reset it. Pass an `AbortSignal` to cancel through its controller.
+An already aborted signal, queued cancellation or queued deadline prevents dispatch.
+
+After assignment, abort or deadline discards the shared pipelined connection.
+Other queries already assigned to that connection can also fail with an unknown
+outcome. This is not per-query PostgreSQL cancellation: server-side work may
+continue after disconnect. Configure PostgreSQL `statement_timeout` separately
+when a server-side execution limit is needed.
+
+## QueryExecutorError
+
+Errors expose `code`, `outcome`, `safeToRetry` and the original `cause`, when present.
+
+| `outcome`        | Meaning                                                               | `safeToRetry` |
+| ---------------- | --------------------------------------------------------------------- | ------------- |
+| `'not-sent'`     | This attempt was not assigned for dispatch.                           | `true`        |
+| `'server-error'` | PostgreSQL returned a statement error; `code` preserves its SQLSTATE. | `false`       |
+| `'unknown'`      | Assigned work may have executed, even if completion was not received. | `false`       |
+
+Local errors use `PG_EXECUTOR_INVALID`, `PG_EXECUTOR_OVERLOADED`,
+`PG_EXECUTOR_UNAVAILABLE`, `PG_EXECUTOR_CLOSED`, `PG_EXECUTOR_DESTROYED`,
+`PG_EXECUTOR_ABORTED`, `PG_EXECUTOR_TIMEOUT`, `PG_EXECUTOR_TRANSACTION` or
+`PG_EXECUTOR_UNKNOWN`. Abort and timeout outcomes depend on whether assignment
+has occurred. Collateral failures use a generic transport error, not another
+query's abort reason.
+
+The executor never replays assigned queries, including `SELECT`. An unknown outcome
+requires application-level reconciliation before retrying writes. `safeToRetry`
+is true only for `'not-sent'`; it does not override application retry policy.
+
+If no healthy connection remains after a connection failure, waiting work can
+reject as unavailable. `retryAfterMillis`, when present, gives the remaining brief
+connection-creation cooldown. Later submissions can reconnect; no hidden query
+retry loop runs in the background.
+
+## Counts
+
+- `executor.totalCount`: current connections, including connecting and closing clients.
+- `executor.waitingCount`: queries waiting for assignment.
+- `executor.inFlightCount`: assigned queries awaiting completion.
+
+## executor.end
+
+`executor.end() => Promise<void>`
+
+Stops accepting new queries, drains accepted work and closes connections. Repeated
+calls return the same shutdown Promise. New queries reject with
+`PG_EXECUTOR_CLOSED` and outcome `'not-sent'`. With query deadlines disabled,
+graceful shutdown can wait indefinitely for work; use `destroy()` to stop waiting.
+
+## executor.destroy
+
+`executor.destroy(cause?) => Promise<void>`
+
+Stops admission and discards connections. Waiting queries reject with
+`PG_EXECUTOR_DESTROYED` and outcome `'not-sent'`; assigned queries reject with
+`PG_EXECUTOR_UNKNOWN` and outcome `'unknown'`. The optional cause is retained.
+The Promise resolves after connections close. Repeated calls share the shutdown
+Promise, and `destroy()` can interrupt an earlier `end()`.

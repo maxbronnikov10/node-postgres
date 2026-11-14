@@ -1,3 +1,5 @@
+import type { BufferReader } from './buffer-reader'
+
 export type Mode = 'text' | 'binary'
 
 export type MessageName =
@@ -224,6 +226,59 @@ export class CommandCompleteMessage {
     public readonly length: number,
     public readonly text: string
   ) {}
+}
+
+export class ProtocolError extends Error {
+  public readonly name = 'ProtocolError'
+  public readonly code = 'PG_PROTOCOL_ERROR'
+}
+
+export class RawDataRowMessage {
+  public readonly name = 'dataRow'
+  public readonly fieldCount: number
+  public readonly buffer: Buffer
+  public readonly offset: number
+
+  constructor(
+    public length: number,
+    reader: BufferReader
+  ) {
+    const buffer = (this.buffer = reader.getBuffer())
+    this.offset = reader.getOffset()
+    const end = this.offset + length - 4
+    if (this.offset + 2 > end) throw new ProtocolError('DataRow is missing its field count')
+    this.fieldCount = buffer.readUInt16BE(this.offset)
+    let offset = this.offset + 2
+    for (let i = 0; i < this.fieldCount; i++) {
+      if (offset + 4 > end) throw new ProtocolError('DataRow is missing a field length')
+      const length = buffer.readInt32BE(offset)
+      offset += 4
+      if (length < -1 || (length >= 0 && length > end - offset)) {
+        throw new ProtocolError('DataRow field length is outside its payload')
+      }
+      if (length !== -1) offset += length
+    }
+    if (offset !== end) throw new ProtocolError('DataRow contains trailing bytes')
+  }
+
+  get raw(): Buffer {
+    const raw = this.buffer.subarray(this.offset, this.offset + this.length - 4)
+    Object.defineProperty(this, 'raw', { value: raw, enumerable: true })
+    return raw
+  }
+
+  get fields(): (string | null)[] {
+    const fields = new Array<string | null>(this.fieldCount)
+    let offset = this.offset + 2
+    for (let i = 0; i < this.fieldCount; i++) {
+      const length = this.buffer.readInt32BE(offset)
+      offset += 4
+      fields[i] = length === -1 ? null : this.buffer.toString('utf8', offset, offset + length)
+      if (length !== -1) offset += length
+    }
+    Object.defineProperty(this, 'fields', { value: fields, enumerable: true, writable: true })
+    return fields
+  }
 }
 
 export class DataRowMessage {
