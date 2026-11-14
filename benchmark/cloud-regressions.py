@@ -44,6 +44,8 @@ class RegressionRun:
 
     def run(self):
         package = self.root / "packages/pg"
+        # Git preserves only the executable bit, while pgpass requires a private file.
+        (package / "test/unit/client/pgpass.file").chmod(0o600)
         files = [
             str(file.relative_to(package))
             for directory in ("test/unit", "test/integration")
