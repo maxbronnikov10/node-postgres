@@ -4,7 +4,12 @@
 // two arms scenario by scenario. Each message names a scenario and a duration, the reply is the
 // queries per second it reached. The arms never share a heap or a JIT.
 
+process.on('disconnect', () => process.exit(1))
+
 const path = require('path')
+const assert = require('assert/strict')
+const { createQueueScenarios } = require('./queue-check')
+const { createAutocommitWorkload } = require('./autocommit')
 
 const root = path.resolve(process.env.PG_BENCH_MODULE)
 const pg = require(path.join(root, 'packages/pg'))
@@ -13,6 +18,7 @@ const QueryStream = require(path.join(root, 'packages/pg-query-stream'))
 
 const BATCH = 10
 const ROWS = 500
+const NAMED_CACHE = 1000
 // the scratch table holds one range of ids per arm, so the arms' deletes never meet
 const ARMS = 4
 const SCRATCH_PER_ARM = 200000
@@ -69,10 +75,57 @@ const placeholders = values()
   .map((_, i) => `$${i + 1}`)
   .join(', ')
 
+const parameterized = (value) => ({ text: 'SELECT $1::int AS value', values: [value] })
+const batchConfigs = () => Array.from({ length: BATCH }, (_, i) => parameterized(i))
+const namedConfigs = () => batchConfigs().map((config, i) => ({ ...config, name: `benchmark_batch_${i}` }))
+
+const consumeValue = (result, value) => {
+  assert.equal(result.rowCount, 1)
+  assert.equal(result.rows.length, 1)
+  assert.equal(result.rows[0].value, value)
+  return 1
+}
+
+const consumeBatch = (results) => {
+  assert.equal(results.length, BATCH)
+  for (let i = 0; i < results.length; i++) consumeValue(results[i], i)
+  return BATCH
+}
+
+const transactionBatch = async ({ client, configs }) => {
+  await client.query('BEGIN')
+  // Upstream has no batch API; run the same queries through its pipeline instead.
+  const results =
+    typeof client.batch === 'function'
+      ? await client.batch(configs)
+      : await Promise.all(configs.map((config) => client.query(config)))
+  const count = consumeBatch(results)
+  await client.query('COMMIT')
+  return count + 2
+}
+
 // each scenario runs one iteration and returns how many queries it ran
-const scenarios = ({ client, pipelined, pool }) => {
+const scenarios = ({ client, pipelined, prepared, batched, automatic, pool, contendedPool }) => {
   let deleted = 0
   let updated = 0
+  const deleteOne = async () => {
+    assert.ok(deleted < SCRATCH_PER_ARM, 'delete range exhausted before reset')
+    const result = await client.query('DELETE FROM benchmark_scratch WHERE id = $1', [scratchFrom + deleted++])
+    assert.equal(result.rowCount, 1)
+    return 1
+  }
+  deleteOne.limit = SCRATCH_PER_ARM
+  deleteOne.prepare = async () => {
+    await client.query('DELETE FROM benchmark_scratch WHERE id >= $1 AND id < $2', [
+      scratchFrom,
+      scratchFrom + SCRATCH_PER_ARM,
+    ])
+    await client.query(
+      "INSERT INTO benchmark_scratch (id, small, string_value) SELECT i, i % 1000, 'x' FROM generate_series($1::int, $2::int) i",
+      [scratchFrom, scratchFrom + SCRATCH_PER_ARM - 1]
+    )
+    deleted = 0
+  }
   return {
     'select 1 row, all types, prepared': async () => consume((await client.query(select(1))).rows),
     'select 100 rows, all types, prepared': async () => consume((await client.query(select(100))).rows),
@@ -85,6 +138,29 @@ const scenarios = ({ client, pipelined, pool }) => {
     // unnamed, so parse and bind are paid on every query
     'select by id, parameterized': async () =>
       consume((await client.query('SELECT * FROM benchmark_rows WHERE id = $1', [42])).rows),
+    'select parameter, config object': async () => consumeValue(await client.query(parameterized(42)), 42),
+    'select parameter, maxAutoPrepare': async () => consumeValue(await prepared.query(parameterized(42)), 42),
+    [`transaction, explicit batch x${BATCH}`]: async () =>
+      transactionBatch({ client: batched, configs: batchConfigs() }),
+    [`transaction, named cached batch x${BATCH}`]: async () =>
+      transactionBatch({ client: batched, configs: namedConfigs() }),
+    [`transaction, autoBatch x${BATCH}`]: async () => {
+      await automatic.query('BEGIN')
+      const count = consumeBatch(await Promise.all(batchConfigs().map((config) => automatic.query(config))))
+      await automatic.query('COMMIT')
+      return count + 2
+    },
+    [`pool contention, max 1, select parameter x${BATCH}`]: async () => {
+      const held = await contendedPool.connect()
+      let pending
+      try {
+        pending = batchConfigs().map((config) => contendedPool.query(config))
+        assert.equal(contendedPool.waitingCount, BATCH)
+      } finally {
+        held.release()
+      }
+      return consumeBatch(await Promise.all(pending))
+    },
     'insert, all types, returning': async () =>
       consume(
         (await client.query(`INSERT INTO benchmark_scratch VALUES (${placeholders}) RETURNING *`, values())).rows
@@ -99,10 +175,7 @@ const scenarios = ({ client, pipelined, pool }) => {
       ])
       return 1
     },
-    'delete, parameterized': async () => {
-      await client.query('DELETE FROM benchmark_scratch WHERE id = $1', [scratchFrom + deleted++])
-      return 1
-    },
+    'delete, parameterized': deleteOne,
     // begin and commit go through the simple query protocol, the insert through the extended one
     'transaction, 3 queries': async () => {
       await client.query('BEGIN')
@@ -136,17 +209,76 @@ const scenarios = ({ client, pipelined, pool }) => {
 }
 
 const measure = async (fn, ms) => {
-  // what the previous measurement left behind is not this one's to collect. The collections
-  // inside the window stay: a change that allocates more pays for it here, as it does in production
-  global.gc()
   let count = 0
-  const start = process.hrtime.bigint()
   let elapsed = 0
-  while (elapsed < ms) {
-    count += await fn()
-    elapsed = Number(process.hrtime.bigint() - start) / 1e6
-  }
+  do {
+    // Destructive fixtures reset outside every timed window, including between bounded chunks.
+    if (fn.prepare) await fn.prepare()
+    global.gc()
+    let iterations = 0
+    const start = process.hrtime.bigint()
+    let window
+    do {
+      count += await fn()
+      iterations++
+      window = Number(process.hrtime.bigint() - start) / 1e6
+    } while (elapsed + window < ms && iterations < (fn.limit || Infinity))
+    elapsed += window
+  } while (elapsed < ms)
+  if (fn.prepare) await fn.prepare()
   return (count * 1000) / elapsed
+}
+
+const ablation = async () => {
+  const controls = Number(process.env.PG_BENCH_ARM) % 2 === 0
+  const variants = {
+    'autoBatch only': { autoBatch: true },
+    'prepare only': { maxAutoPrepare: 16 },
+    'autoBatch + prepare': { autoBatch: true, maxAutoPrepare: 16 },
+  }
+  const clients = []
+  const all = {}
+  for (const [name, options] of Object.entries(variants)) {
+    const client = new pg.Client({ pipeline: true, ...(controls ? {} : options) })
+    clients.push(client)
+    await client.connect()
+    all[`ablation, ${name}`] = async () => {
+      assert.equal((await client.query('BEGIN')).command, 'BEGIN')
+      const count = consumeBatch(await Promise.all(batchConfigs().map((config) => client.query(config))))
+      assert.equal((await client.query('COMMIT')).command, 'COMMIT')
+      return count + 2
+    }
+  }
+  return { all, clients, pools: [] }
+}
+
+const payload = async () => {
+  const client = new pg.Client()
+  assert.equal(typeof client.batch, 'function', 'payload profile requires client.batch on both checkouts')
+  const all = {}
+  for (const { mib, bytes } of [
+    { mib: 1, bytes: 1048576 },
+    { mib: 8, bytes: 8388608 },
+  ]) {
+    const configs = Array.from({ length: 2 }, () => ({
+      text: 'SELECT octet_length($1::bytea) AS n',
+      values: [Buffer.alloc(bytes, 0x61)],
+    }))
+    all[`payload, explicit batch 2 x ${mib} MiB`] = async () => {
+      assert.equal((await client.query('BEGIN')).command, 'BEGIN')
+      const results = await client.batch(configs)
+      assert.equal(results.length, 2)
+      for (const result of results) {
+        assert.equal(result.rowCount, 1)
+        assert.equal(result.rows.length, 1)
+        assert.equal(result.rows[0].n, bytes)
+      }
+      assert.equal((await client.query('COMMIT')).command, 'COMMIT')
+      return 4
+    }
+  }
+  await client.connect()
+  return { all, clients: [client], pools: [] }
 }
 
 const setup = async (client) => {
@@ -162,23 +294,51 @@ const setup = async (client) => {
   )
 }
 
-const main = async () => {
+const regression = async () => {
   const client = new pg.Client()
   const pipelined = new pg.Client({ pipeline: true })
+  const prepared = new pg.Client({ maxAutoPrepare: 16 })
+  const batched = new pg.Client({ pipeline: true, maxAutoPrepare: 16 })
+  const automatic = new pg.Client({ pipeline: true, maxAutoPrepare: 16, autoBatch: true })
   const pool = new pg.Pool({ max: 2 })
-  await client.connect()
-  await pipelined.connect()
-  const all = scenarios({ client, pipelined, pool })
+  const contendedPool = new pg.Pool({ max: 1 })
+  const clients = [client, pipelined, prepared, batched, automatic]
+  const pools = [pool, contendedPool]
+  await Promise.all(clients.map((connection) => connection.connect()))
+  // Prewarm names before timing; these SELECTs need no benchmark tables.
+  for (let i = 0; i < NAMED_CACHE; i++) {
+    consumeValue(await batched.query({ ...parameterized(i), name: `benchmark_batch_${i}` }), i)
+  }
+  const all = scenarios({ client, pipelined, prepared, batched, automatic, pool, contendedPool })
 
+  return { all, clients, pools }
+}
+
+const main = async () => {
+  const profile = process.env.PG_BENCH_PROFILE || 'regression'
+  let workload
+  if (profile === 'queue') {
+    const Pool = require(path.join(root, 'packages/pg-pool'))
+    const { scenarios: all, pools } = createQueueScenarios(Pool)
+    workload = { all, pools, clients: [] }
+  } else if (['autocommit', 'autocommit-prepare', 'autocommit-pipeline'].includes(profile)) {
+    workload = await createAutocommitWorkload({ pg, profile, arm: Number(process.env.PG_BENCH_ARM) })
+  } else if (profile === 'payload') {
+    workload = await payload()
+  } else {
+    workload = await (profile === 'ablation' ? ablation() : regression())
+  }
+  const { all, clients, pools } = workload
   process.on('message', async (msg) => {
     try {
       if (msg.type === 'setup') {
-        await setup(client)
+        if (workload.setup) await workload.setup()
+        else if (profile === 'regression') await setup(clients[0])
         process.send({ ok: true })
       } else if (msg.type === 'run') {
         process.send({ ok: true, qps: await measure(all[msg.scenario], msg.ms) })
       } else if (msg.type === 'end') {
-        await Promise.all([client.end(), pipelined.end(), pool.end()])
+        await Promise.all([...clients, ...pools].map((connection) => connection.end()))
         process.send({ ok: true }, () => process.exit(0))
       }
     } catch (err) {

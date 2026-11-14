@@ -89,7 +89,7 @@ class Query extends EventEmitter {
     try {
       row = this._result.parseRow(msg.fields)
     } catch (err) {
-      this._canceledDueToError = err
+      this._canceledDueToError = utils.toError(err)
       return
     }
 
@@ -153,7 +153,8 @@ class Query extends EventEmitter {
     if (typeof this.text !== 'string' && typeof this.name !== 'string') {
       return new Error('A query must have either text or a name. Supplying neither is unsupported.')
     }
-    const previous = connection.parsedStatements[this.name] || connection.submittedNamedStatements[this.name]
+    const previous =
+      this.name && (connection.parsedStatements[this.name] || connection.submittedNamedStatements[this.name])
     if (this.text && previous && this.text !== previous) {
       return new Error(`Prepared statements must be unique - '${this.name}' was used for a different statement`)
     }
@@ -235,11 +236,13 @@ class Query extends EventEmitter {
         valueMapper: utils.prepareValue,
       })
     } catch (err) {
-      // we should close parse to avoid leaking connections
-      connection.close({ type: 'S', name: this.name })
+      // Keep named statements reusable, including earlier queries still in the pipeline.
+      if (!this.name) {
+        connection.close({ type: 'S', name: this.name })
+      }
       connection.sync()
 
-      this.handleError(err, connection)
+      this._canceledDueToError = utils.toError(err)
       return
     }
 

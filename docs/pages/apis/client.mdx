@@ -31,6 +31,8 @@ type Config = {
   fallback_application_name?: string, // provide an application name to use if application_name is not set
   options?: string, // command-line options to be sent to the server
   pipeline?: boolean // when true, enables query pipelining. See /features/pipelining for details. Default false.
+  autoBatch?: boolean // opt-in grouping of concurrent extended queries inside transactions; requires pipeline: true
+  maxAutoPrepare?: number // maximum automatically named SQL texts per connection; default 0 (disabled)
 }
 ```
 
@@ -56,6 +58,120 @@ const client = new Client()
 
 await client.connect()
 ```
+
+## client.batch
+
+`client.batch(queries: Array<string | QueryConfig>, callback?: Function) => Promise<Result[]> | void`
+
+Executes a group of parameterized statements with one protocol synchronization point.
+Call it on an idle JavaScript client after awaiting `BEGIN`. Results retain the order,
+rows, fields and row counts of the input queries. A callback receives `(err, results)`
+instead of a returned Promise. This API also works with `pipeline: false`.
+
+```js
+await client.query('BEGIN')
+try {
+  const results = await client.batch([
+    { text: 'UPDATE accounts SET balance = balance - $1 WHERE id = $2', values: [100, 1] },
+    { text: 'UPDATE accounts SET balance = balance + $1 WHERE id = $2 RETURNING balance', values: [100, 2] },
+  ])
+  await client.query('COMMIT')
+  console.log(results[1].rows)
+} catch (err) {
+  await client.query('ROLLBACK')
+  throw err
+}
+```
+
+A batch does not commit or roll back the transaction. On error, later unsent or
+server-skipped commands do not produce results; the batch rejects with the original
+error. A zero-based `batchIndex` is attached when possible; existing or read-only metadata is preserved. Roll back the transaction or an earlier
+savepoint before continuing after a server error. A local parameter-encoding error
+can occur after earlier commands have executed, so it also requires caller recovery.
+Successful completion confirms the statements, not a transaction commit.
+
+Each entry must contain one statement. COPY, cursor/portal options, per-entry callbacks
+and per-entry timeouts are unsupported. COPY terminates the connection rather than
+leaving it in an unusable protocol state. Keep transaction control outside the batch.
+Client-level `query_timeout` applies to the whole batch. Input and returned rows are
+held in memory; choose batch sizes accordingly. Outgoing messages are encoded in
+bounded chunks and wait for socket drain before encoding more.
+
+## Automatic transaction batching
+
+With `{ pipeline: true, autoBatch: true }`, ordinary concurrent `query()` calls can share
+one `Sync` inside an explicit transaction. Each call still returns its own Promise or
+uses its own callback. The option defaults to false and requires `pipeline: true`.
+
+```js
+const client = new Client({ pipeline: true, autoBatch: true })
+await client.connect()
+await client.query('BEGIN')
+try {
+  const results = await Promise.all([
+    client.query('UPDATE accounts SET balance = balance - $1 WHERE id = $2', [100, 1]),
+    client.query('UPDATE accounts SET balance = balance + $1 WHERE id = $2 RETURNING balance', [100, 2]),
+  ])
+  await client.query('COMMIT')
+  console.log(results[1].rows)
+} catch (err) {
+  await client.query('ROLLBACK')
+  throw err
+} finally {
+  await client.end()
+}
+```
+
+On an idle connection after `BEGIN`, the driver waits until the next Node.js tick and
+groups consecutive eligible calls. Eligible queries use the extended protocol and
+start with SELECT, INSERT, UPDATE, DELETE, MERGE or WITH (ignoring leading whitespace).
+Plain unparameterized SQL, comments before the command, transaction control, custom
+query classes, portals and queries with a client-side `query_timeout` keep their normal
+paths. Calls arriving later may form another group or use ordinary pipelining.
+`statement_timeout` continues to work on the server.
+
+On a server error, already completed queries retain their results and the failing query
+rejects with its original error. Skipped queries reject with `code: 'PG_BATCH_ABORTED'`
+and the original error as `cause`. Local validation/encoding can fail before some queries
+are sent. Use `Promise.all()` or `Promise.allSettled()` so every rejection is handled;
+roll back the transaction or its savepoint before continuing after a server error.
+Successful query promises do not imply that the transaction has committed.
+
+Batching remains opt-in because a local parameter-conversion error can skip later
+queries that ordinary pipelining would still execute. Keep it disabled when those
+per-query error boundaries are required.
+
+### TypeORM
+
+TypeORM passes `extra` to the PostgreSQL driver. Use the transaction's manager so all
+queries share its checked-out connection:
+
+```js
+import { DataSource } from 'typeorm'
+import pg from 'pg'
+
+const dataSource = new DataSource({
+  type: 'postgres',
+  driver: { ...pg }, // select the JavaScript driver even when pg-native is installed
+  url: process.env.DATABASE_URL,
+  extra: { pipeline: true, autoBatch: true },
+})
+await dataSource.initialize()
+
+await dataSource.transaction(async (manager) => {
+  return Promise.all([
+    manager.query('UPDATE accounts SET balance = balance - $1 WHERE id = $2', [100, 1]),
+    manager.query('UPDATE accounts SET balance = balance + $1 WHERE id = $2', [100, 2]),
+  ])
+})
+```
+
+TypeORM owns commit, rollback and savepoint handling. Its normal rows, affected counts
+and `QueryFailedError` wrapping are preserved. Global `dataSource.query()` calls may
+use different connections and cannot share a batch. Query parameters must already be
+known: dependent operations still need an `await` before constructing the next query.
+This API is implemented by this JavaScript driver branch; it requires installing that
+version of `pg` and does not add batching to native bindings.
 
 ## client.pipeline
 

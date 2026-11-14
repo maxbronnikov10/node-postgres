@@ -31,6 +31,7 @@ const setupClient = function () {
   }
   con.sync = function () {
     calls.sync++
+    process.nextTick(() => con.emit('readyForQuery'))
   }
 
   return { client, con, calls }

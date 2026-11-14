@@ -87,8 +87,7 @@ NativeQuery.prototype._getPromise = function () {
 NativeQuery.prototype.submit = function (client) {
   this.state = 'running'
   const self = this
-  this.native = client.native
-  client.native.arrayMode = this._arrayMode
+  this.native = undefined
 
   let after = function (err, rows, results) {
     client.native.arrayMode = false
@@ -128,6 +127,27 @@ NativeQuery.prototype.submit = function (client) {
     after = process.domain.bind(after)
   }
 
+  let values
+  if (this.name || this.values) {
+    if (this.values && !Array.isArray(this.values)) {
+      return after(new Error('Query values must be an array'))
+    }
+    try {
+      values = (this.values || []).map(utils.prepareValue)
+    } catch (err) {
+      return after(utils.toError(err))
+    }
+  }
+
+  const previous = this.name ? client.namedQueries[this.name] : undefined
+  if (previous !== undefined && this.text && previous !== this.text) {
+    return after(new Error(`Prepared statements must be unique - '${this.name}' was used for a different statement`))
+  }
+
+  // Local failures must not inherit error fields from libpq's previous result.
+  this.native = client.native
+  client.native.arrayMode = this._arrayMode
+
   // named query
   if (this.name) {
     if (this.name.length > 63) {
@@ -135,15 +155,9 @@ NativeQuery.prototype.submit = function (client) {
       console.error('You supplied %s (%s)', this.name, this.name.length)
       console.error('This can cause conflicts and silent errors executing queries')
     }
-    const values = (this.values || []).map(utils.prepareValue)
-
     // check if the client has already executed this named query
     // if so...just execute it again - skip the planning phase
-    if (client.namedQueries[this.name] !== undefined) {
-      if (this.text && client.namedQueries[this.name] !== this.text) {
-        const err = new Error(`Prepared statements must be unique - '${this.name}' was used for a different statement`)
-        return after(err)
-      }
+    if (previous !== undefined) {
       return client.native.execute(this.name, values, after)
     }
     // plan the named query the first time, then execute it
@@ -153,12 +167,7 @@ NativeQuery.prototype.submit = function (client) {
       return self.native.execute(self.name, values, after)
     })
   } else if (this.values) {
-    if (!Array.isArray(this.values)) {
-      const err = new Error('Query values must be an array')
-      return after(err)
-    }
-    const vals = this.values.map(utils.prepareValue)
-    client.native.query(this.text, vals, after)
+    client.native.query(this.text, values, after)
   } else if (this.queryMode === 'extended') {
     client.native.query(this.text, [], after)
   } else {

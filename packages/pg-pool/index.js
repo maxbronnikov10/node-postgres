@@ -20,6 +20,9 @@ class IdleItem {
 class PendingItem {
   constructor(callback) {
     this.callback = callback
+    this._prev = undefined
+    this._next = undefined
+    this._queued = false
   }
 }
 
@@ -42,7 +45,11 @@ function promisify(Promise, callback) {
   }).catch((err) => {
     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
     // application that created the query
-    Error.captureStackTrace(err)
+    try {
+      Error.captureStackTrace(err)
+    } catch {
+      // Optional stack rewriting must preserve the original error.
+    }
     throw err
   })
   return { callback: cb, result: result }
@@ -102,7 +109,9 @@ class Pool extends EventEmitter {
     this._clients = []
     this._idle = []
     this._expired = new WeakSet()
-    this._pendingQueue = []
+    this._pendingQueueHead = undefined
+    this._pendingQueueTail = undefined
+    this._pendingQueueCount = 0
     this._endCallback = undefined
     this.ending = false
     this.ended = false
@@ -122,6 +131,44 @@ class Pool extends EventEmitter {
 
   _isAboveMin() {
     return this._clients.length > this.options.min
+  }
+
+  _enqueuePending(pendingItem) {
+    pendingItem._prev = this._pendingQueueTail
+    pendingItem._next = undefined
+    pendingItem._queued = true
+
+    if (this._pendingQueueTail) {
+      this._pendingQueueTail._next = pendingItem
+    } else {
+      this._pendingQueueHead = pendingItem
+    }
+
+    this._pendingQueueTail = pendingItem
+    this._pendingQueueCount++
+  }
+
+  _removePending(pendingItem) {
+    if (!pendingItem._queued) {
+      return
+    }
+
+    if (pendingItem._prev) {
+      pendingItem._prev._next = pendingItem._next
+    } else {
+      this._pendingQueueHead = pendingItem._next
+    }
+
+    if (pendingItem._next) {
+      pendingItem._next._prev = pendingItem._prev
+    } else {
+      this._pendingQueueTail = pendingItem._prev
+    }
+
+    pendingItem._prev = undefined
+    pendingItem._next = undefined
+    pendingItem._queued = false
+    this._pendingQueueCount--
   }
 
   _pulseQueue() {
@@ -145,7 +192,7 @@ class Pool extends EventEmitter {
     }
 
     // if we don't have any waiting, do nothing
-    if (!this._pendingQueue.length) {
+    if (!this._pendingQueueCount) {
       this.log('no queued requests')
       return
     }
@@ -153,7 +200,8 @@ class Pool extends EventEmitter {
     if (!this._idle.length && this._isFull()) {
       return
     }
-    const pendingItem = this._pendingQueue.shift()
+    const pendingItem = this._pendingQueueHead
+    this._removePending(pendingItem)
     if (this._idle.length) {
       const idleItem = this._idle.pop()
       clearTimeout(idleItem.timeoutId)
@@ -204,7 +252,7 @@ class Pool extends EventEmitter {
       }
 
       if (!this.options.connectionTimeoutMillis) {
-        this._pendingQueue.push(new PendingItem(response.callback))
+        this._enqueuePending(new PendingItem(response.callback))
         return result
       }
 
@@ -219,7 +267,7 @@ class Pool extends EventEmitter {
       const tid = setTimeout(() => {
         // remove the callback from pending waiters because
         // we're going to call it with a timeout error
-        removeWhere(this._pendingQueue, (i) => i.callback === queueCallback)
+        this._removePending(pendingItem)
         pendingItem.timedOut = true
         response.callback(new Error('timeout exceeded when trying to connect'))
       }, this.options.connectionTimeoutMillis)
@@ -228,7 +276,7 @@ class Pool extends EventEmitter {
         tid.unref()
       }
 
-      this._pendingQueue.push(pendingItem)
+      this._enqueuePending(pendingItem)
       return result
     }
 
@@ -404,6 +452,13 @@ class Pool extends EventEmitter {
       return this._remove(client, this._pulseQueue.bind(this))
     }
 
+    if (this._pendingQueueCount) {
+      const pendingItem = this._pendingQueueHead
+      this._removePending(pendingItem)
+      client.ref && client.ref()
+      return this._acquireClient(client, pendingItem, idleListener, false)
+    }
+
     // idle timeout
     let tid
     if (this.options.idleTimeoutMillis && this._isAboveMin()) {
@@ -499,7 +554,7 @@ class Pool extends EventEmitter {
   }
 
   get waitingCount() {
-    return this._pendingQueue.length
+    return this._pendingQueueCount
   }
 
   get idleCount() {
