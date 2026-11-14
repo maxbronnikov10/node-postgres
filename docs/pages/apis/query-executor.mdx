@@ -33,13 +33,15 @@ Ordinary `Client` and `Pool` do not acquire this requirement.
 Accepts [Client connection options](/apis/client#new-client), including connection
 strings, TLS, type parsers and prepared-statement options, plus these limits:
 
-| Option                     | Default | Meaning                                                              |
-| -------------------------- | ------- | -------------------------------------------------------------------- |
-| `max`                      | `4`     | Maximum physical frontend connections, including connecting clients. |
-| `maxInFlightPerConnection` | `16`    | Maximum queries assigned to each connection.                         |
-| `maxPending`               | `1024`  | Maximum queries waiting for assignment.                              |
-| `query_timeout`            | `30000` | Query deadline in milliseconds, including queue and connection wait. |
-| `connectionTimeoutMillis`  | `5000`  | Timeout in milliseconds for each connection attempt.                 |
+| Option                     | Default    | Meaning                                                                        |
+| -------------------------- | ---------- | ------------------------------------------------------------------------------ |
+| `max`                      | `4`        | Maximum physical frontend connections, including connecting clients.           |
+| `maxInFlightPerConnection` | `16`       | Maximum queries assigned to each connection.                                   |
+| `maxPending`               | `1024`     | Maximum queries waiting for assignment.                                        |
+| `query_timeout`            | `30000`    | Query deadline in milliseconds, including queue and connection wait.           |
+| `connectionTimeoutMillis`  | `5000`     | Timeout in milliseconds for each connection attempt.                           |
+| `maxMessageSize`           | `16777216` | Maximum inbound message length, including its four-byte length field.          |
+| `targetSessionAttrs`       | `'any'`    | Required default transaction access: `'any'`, `'read-write'` or `'read-only'`. |
 
 Limits must be positive safe integers. Timeouts must be integers from `0` to
 `2147483647`; `0` disables that timeout. Invalid constructor options throw
@@ -64,6 +66,53 @@ With transaction-mode PgBouncer, named statements and `maxAutoPrepare` require
 compatible protocol prepared-statement tracking, including a nonzero
 `max_prepared_statements`. The executor does not make session-scoped SQL `PREPARE`
 safe for transaction pooling.
+
+### Endpoint selection and recovery
+
+```js
+const executor = new QueryExecutor({
+  connectionString: process.env.DATABASE_URL,
+  endpoints: [
+    { host: 'db-a.example', port: 5432 },
+    { host: 'db-b.example', port: 5432 },
+  ],
+  targetSessionAttrs: 'read-write',
+  connectionTimeoutMillis: 2000,
+})
+```
+
+An explicit `endpoints` list contains 1–64 objects with a required nonempty `host`
+and optional integer `port`, `ssl` and `sslnegotiation`. Other keys are rejected.
+Connection-string defaults are parsed first, then the endpoint overrides its host,
+port and explicitly supplied TLS settings. Shared custom stream/connection instances
+cannot be combined with endpoints. Unspecified settings inherit normal Client defaults.
+
+Creation attempts rotate through eligible endpoints. Failures have a brief per-endpoint
+cooldown; an uninterrupted outage visits each endpoint once before refusing unsent work.
+A later submission can try again. Successful application work permits future recovery
+attempts without a background retry loop. Already assigned SQL is never replayed.
+
+For a non-`any` target, the executor runs `SHOW transaction_read_only` before admitting
+application SQL. `read-write` requires `off`; `read-only` requires `on`, which also
+includes a deliberately read-only primary. Connection timeout includes the probe.
+This is a connection-time property, not continuous topology monitoring. A proxy must
+route the session to backends with the intended role. A read-only SQL error (`25006`)
+on a `read-write` executor poisons that client; the failing statement retains a
+server-error outcome and is not retried. Collateral assigned work can be unknown.
+
+Each endpoint retains normal TLS verification against its own hostname. Configure
+an explicit certificate identity or CA per endpoint when required; no TLS downgrade
+or certificate-verification fallback is performed.
+
+### Inbound message limits
+
+`maxMessageSize` must be an integer from 4 to 2147483647. It caps one backend
+message's declared length, including the length field and excluding the tag byte.
+Oversized headers and truncated messages close the transport with PG_PROTOCOL_ERROR.
+Assigned SQL then has an unknown outcome. A larger explicit cap is available for
+large fields. Multiple valid messages can share a chunk whose combined size exceeds
+the cap. This limit does not bound total result rows or JavaScript heap usage;
+many small rows can still form a large eager Result.
 
 ## executor.query
 

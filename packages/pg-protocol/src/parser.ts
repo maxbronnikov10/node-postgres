@@ -49,7 +49,8 @@ export type Packet = {
 const emptyBuffer = Buffer.allocUnsafe(0)
 
 type StreamOptions = TransformOptions & {
-  mode: Mode | 'raw'
+  mode?: Mode | 'raw'
+  maxMessageSize?: number
 }
 
 const enum MessageCodes {
@@ -86,10 +87,19 @@ export class Parser {
   private reader = new BufferReader()
   private mode: Mode | 'raw'
   private bufferShared = false
+  private maxMessageSize: number
 
   constructor(opts?: StreamOptions) {
     if (opts?.mode === 'binary') {
       throw new Error('Binary mode not supported yet')
+    }
+    this.maxMessageSize = opts?.maxMessageSize === undefined ? 2147483647 : opts.maxMessageSize
+    if (
+      !Number.isInteger(this.maxMessageSize) ||
+      this.maxMessageSize < LEN_LENGTH ||
+      this.maxMessageSize > 2147483647
+    ) {
+      throw new RangeError('maxMessageSize must be an integer between 4 and 2147483647')
     }
     this.mode = opts?.mode || 'text'
   }
@@ -98,7 +108,27 @@ export class Parser {
     this.mode = mode
   }
 
+  public end(): void {
+    if (this.bufferLength > 0) throw new ProtocolError('Unexpected EOF in protocol message')
+  }
+
+  private assertMessageLength(length: number): void {
+    if (length < LEN_LENGTH) throw new ProtocolError('Message length is smaller than its header')
+    if (length > this.maxMessageSize) throw new ProtocolError('Message length exceeds maxMessageSize')
+  }
+
   public parse(buffer: Buffer, callback: MessageCallback) {
+    if (
+      this.bufferLength > 0 &&
+      this.bufferLength < HEADER_LENGTH &&
+      this.bufferLength + buffer.length >= HEADER_LENGTH
+    ) {
+      // Validate a split header before allocating space for the incoming body.
+      const header = Buffer.allocUnsafe(HEADER_LENGTH)
+      this.buffer.copy(header, 0, this.bufferOffset, this.bufferOffset + this.bufferLength)
+      buffer.copy(header, this.bufferLength, 0, HEADER_LENGTH - this.bufferLength)
+      this.assertMessageLength(header.readUInt32BE(CODE_LENGTH))
+    }
     this.mergeBuffer(buffer)
     const bufferFullLength = this.bufferOffset + this.bufferLength
     let offset = this.bufferOffset
@@ -107,7 +137,7 @@ export class Parser {
       const code = this.buffer[offset]
       // length is 1 Uint32BE - it is the length of the message EXCLUDING the code
       const length = this.buffer.readUInt32BE(offset + CODE_LENGTH)
-      if (length < LEN_LENGTH) throw new ProtocolError('Message length is smaller than its header')
+      this.assertMessageLength(length)
       const fullMessageLength = CODE_LENGTH + length
       if (fullMessageLength + offset <= bufferFullLength) {
         const message = this.handlePacket(offset + HEADER_LENGTH, code, length, this.buffer)

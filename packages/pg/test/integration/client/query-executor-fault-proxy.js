@@ -81,6 +81,7 @@ class QueryExecutorFaultProxy {
           if (startupReady && !this.dropped) {
             this.dropped = true
             pending = Buffer.alloc(0)
+            if (this.mode === 'hold-completion') return
             return close()
           }
           startupReady = true

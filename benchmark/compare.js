@@ -130,6 +130,10 @@ const markdown = ({ labels, rows, rounds, duration, profile }) => {
       )
   } else if (profile === 'autocommit') {
     lines.push('Default options on both checkouts; independent queries without BEGIN. Pool max: 4; concurrency: 16.')
+  } else if (profile === 'executor-regression') {
+    lines.push(
+      'Before/after QueryExecutor on both arms: max 4, depth 16, maxPending 1024, maxAutoPrepare 16, target any. Four warmed frontends, checked results, no BEGIN. Actors run sequentially and update identical fixed keys.'
+    )
   } else if (profile === 'autocommit-prepare') {
     lines.push(
       'Same checkout. Base: maxAutoPrepare 0. Head: maxAutoPrepare 16. Pipeline disabled; no BEGIN. Pool max: 4; concurrency: 16.'
@@ -191,6 +195,7 @@ const main = async () => {
       'rows',
       'row-formats',
       'executor',
+      'executor-regression',
     ].includes(profile)
   ) {
     throw new Error(`unknown profile: ${profile}`)

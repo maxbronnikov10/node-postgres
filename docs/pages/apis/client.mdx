@@ -34,6 +34,7 @@ type Config = {
   pipeline?: boolean // when true, enables query pipelining. See /features/pipelining for details. Default false.
   autoBatch?: boolean // opt-in grouping of concurrent extended queries inside transactions; requires pipeline: true
   maxAutoPrepare?: number // maximum automatically named SQL texts per connection; default 0 (disabled)
+  maxMessageSize?: number // inbound frame length including its four-byte length field; default 2147483647
 }
 ```
 

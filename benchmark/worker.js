@@ -342,6 +342,8 @@ const main = async () => {
     workload = await createRowWorkload({ pg, profile, arm: Number(process.env.PG_BENCH_ARM) })
   } else if (profile === 'executor') {
     workload = await createExecutorWorkload({ pg, arm: Number(process.env.PG_BENCH_ARM) })
+  } else if (profile === 'executor-regression') {
+    workload = await createExecutorWorkload({ pg, arm: 1 })
   } else if (profile === 'payload') {
     workload = await payload()
   } else {

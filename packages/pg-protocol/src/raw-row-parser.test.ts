@@ -123,7 +123,7 @@ describe('raw DataRow decoding', () => {
       assert.deepStrictEqual(messages, [])
       done()
     })
-    parseRaw(stream, (message) => messages.push(message))
+    parseRaw({ stream, callback: (message) => messages.push(message) })
 
     stream.write(Buffer.from([68, 0, 0, 0, 6, 0, 1]))
   })
@@ -131,8 +131,11 @@ describe('raw DataRow decoding', () => {
   for (const error of [new Error('application callback failed'), new ProtocolError('application protocol error')]) {
     it(`propagates callback ${error.name} without destroying transport`, () => {
       const stream = new PassThrough()
-      parseRaw(stream, () => {
-        throw error
+      parseRaw({
+        stream,
+        callback: () => {
+          throw error
+        },
       })
 
       assert.throws(
@@ -160,9 +163,12 @@ describe('text DataRow decoding', () => {
   it('switches modes between packets delivered in one stream chunk', () => {
     const stream = new PassThrough()
     const messages: any[] = []
-    const parser = parseRaw(stream, (message) => {
-      messages.push(message)
-      parser.setDataRowMode('text')
+    const parser = parseRaw({
+      stream,
+      callback: (message) => {
+        messages.push(message)
+        parser.setDataRowMode('text')
+      },
     })
 
     stream.write(Buffer.concat([bytesRow, textRow]))

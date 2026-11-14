@@ -70,6 +70,12 @@ class Client extends EventEmitter {
     this.replication = this.connectionParameters.replication
 
     const c = config || {}
+    if (
+      c.maxMessageSize !== undefined &&
+      (!Number.isInteger(c.maxMessageSize) || c.maxMessageSize < 4 || c.maxMessageSize > 2147483647)
+    ) {
+      throw new TypeError('maxMessageSize must be an integer from 4 to 2147483647')
+    }
 
     if (c.Promise) {
       byoPromiseDeprecationNotice()
@@ -96,6 +102,7 @@ class Client extends EventEmitter {
         keepAlive: c.keepAlive || false,
         keepAliveInitialDelayMillis: c.keepAliveInitialDelayMillis || 0,
         encoding: this.connectionParameters.client_encoding || 'utf8',
+        maxMessageSize: c.maxMessageSize,
       })
     this._queryQueue = []
     this._sentQueryQueue = []

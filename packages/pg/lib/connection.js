@@ -22,6 +22,7 @@ class Connection extends EventEmitter {
     }
 
     this._keepAlive = config.keepAlive
+    this._maxMessageSize = config.maxMessageSize
     this._keepAliveInitialDelayMillis = config.keepAliveInitialDelayMillis
     this.parsedStatements = Object.create(null)
     this.submittedNamedStatements = Object.create(null)
@@ -135,12 +136,16 @@ class Connection extends EventEmitter {
   }
 
   attachListeners(stream) {
-    this._parser = parseRaw(stream, (msg) => {
-      const eventName = msg.name === 'error' ? 'errorMessage' : msg.name
-      if (this._emitMessage) {
-        this.emit('message', msg)
-      }
-      this.emit(eventName, msg)
+    this._parser = parseRaw({
+      stream,
+      maxMessageSize: this._maxMessageSize,
+      callback: (msg) => {
+        const eventName = msg.name === 'error' ? 'errorMessage' : msg.name
+        if (this._emitMessage) {
+          this.emit('message', msg)
+        }
+        this.emit(eventName, msg)
+      },
     })
   }
 

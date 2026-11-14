@@ -3,6 +3,7 @@
 const events = require('events')
 const Client = require('./client')
 const { DatabaseError } = require('pg-protocol')
+const { parse: parseConnectionString } = require('pg-connection-string')
 
 class QueryExecutorError extends Error {
   constructor({ message, code, outcome, cause, retryAfterMillis }) {
@@ -38,15 +39,45 @@ class QueryExecutor {
     this._assertTimeout(this._timeout)
     const connectionTimeoutMillis = options.connectionTimeoutMillis ?? 5000
     this._assertTimeout(connectionTimeoutMillis)
-    this._options = { ...options, connectionTimeoutMillis, query_timeout: 0, pipeline: true, autoBatch: false }
+    this._targetSessionAttrs = options.targetSessionAttrs ?? 'any'
+    if (!['any', 'read-write', 'read-only'].includes(this._targetSessionAttrs)) {
+      throw this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Invalid targetSessionAttrs' })
+    }
+    const maxMessageSize = options.maxMessageSize ?? 16777216
+    if (!Number.isInteger(maxMessageSize) || maxMessageSize < 4 || maxMessageSize > 2147483647) {
+      throw this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Invalid maxMessageSize' })
+    }
+    let parsed
+    try {
+      parsed = options.connectionString ? parseConnectionString(options.connectionString) : {}
+    } catch (cause) {
+      throw this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Invalid connection string', cause })
+    }
+    this._options = {
+      ...options,
+      ...parsed,
+      connectionTimeoutMillis,
+      maxMessageSize,
+      query_timeout: 0,
+      pipeline: true,
+      autoBatch: false,
+    }
+    if (options.endpoints !== undefined && (options.stream !== undefined || options.connection !== undefined)) {
+      throw this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Endpoints require independently owned connections' })
+    }
+    this._endpoints = this._toEndpoints(options.endpoints)
+    this._nextEndpoint = 0
+    this._generation = 0
     delete this._options.max
     delete this._options.maxInFlightPerConnection
     delete this._options.maxPending
+    delete this._options.connectionString
+    delete this._options.endpoints
+    delete this._options.targetSessionAttrs
     this._records = new Set()
     this._pending = new Map()
     this._inFlight = 0
     this._state = 'open'
-    this._cooldownUntil = 0
     this._lastFailure = undefined
     this._pumping = false
     this._closePromise = undefined
@@ -73,6 +104,47 @@ class QueryExecutor {
         message: 'Timeouts must be integers from 0 to 2147483647 milliseconds',
       })
     }
+  }
+
+  _toEndpoints(input) {
+    if (input === undefined) return [{ config: {}, retryAt: 0, failedGeneration: -1 }]
+    if (!Array.isArray(input) || input.length === 0 || input.length > 64) {
+      throw this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Expected 1 to 64 endpoints' })
+    }
+    return input.map((endpoint) => {
+      if (
+        !endpoint ||
+        typeof endpoint !== 'object' ||
+        Array.isArray(endpoint) ||
+        typeof endpoint.host !== 'string' ||
+        !endpoint.host.trim() ||
+        Object.keys(endpoint).some((key) => !['host', 'port', 'ssl', 'sslnegotiation'].includes(key)) ||
+        (endpoint.port !== undefined &&
+          (!Number.isInteger(endpoint.port) || endpoint.port < 1 || endpoint.port > 65535)) ||
+        (endpoint.ssl !== undefined &&
+          typeof endpoint.ssl !== 'boolean' &&
+          (!endpoint.ssl || typeof endpoint.ssl !== 'object' || Array.isArray(endpoint.ssl))) ||
+        (endpoint.sslnegotiation !== undefined && !['postgres', 'direct'].includes(endpoint.sslnegotiation))
+      ) {
+        throw this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Invalid endpoint configuration' })
+      }
+      const config = { ...endpoint }
+      for (const key of Object.keys(config)) if (config[key] === undefined) delete config[key]
+      return { config, retryAt: 0, failedGeneration: -1 }
+    })
+  }
+
+  _pickEndpoint() {
+    const now = performance.now()
+    for (let i = 0; i < this._endpoints.length; i++) {
+      const index = (this._nextEndpoint + i) % this._endpoints.length
+      const endpoint = this._endpoints[index]
+      if (endpoint.retryAt <= now && endpoint.failedGeneration !== this._generation) {
+        this._nextEndpoint = (index + 1) % this._endpoints.length
+        return endpoint
+      }
+    }
+    return null
   }
 
   _toConfig({ input, values, argumentCount }) {
@@ -154,6 +226,7 @@ class QueryExecutor {
         })
         return
       }
+      if (!this._records.size && !this._pending.size) this._generation++
       this._pending.set(task, task)
       if (task.deadline) task.timer = setTimeout(() => this._expire(task), task.timeout)
       this._pump()
@@ -250,29 +323,32 @@ class QueryExecutor {
       for (const record of this._records) {
         if (record.state === 'connecting') projected += this._perConnection
       }
-      while (
-        this._pending.size > projected &&
-        this._records.size < this._max &&
-        performance.now() >= this._cooldownUntil
-      ) {
-        this._open()
-        projected += this._perConnection
+      while (this._pending.size > projected && this._records.size < this._max) {
+        const endpoint = this._pickEndpoint()
+        if (!endpoint) break
+        if (this._open(endpoint)) projected += this._perConnection
       }
       let healthy = false
       for (const record of this._records) {
         if (record.state === 'connecting' || record.state === 'ready') healthy = true
       }
-      if (this._pending.size && !healthy && performance.now() < this._cooldownUntil) {
-        for (const task of this._pending.values())
-          this._settle({
-            task,
-            error: this._error({
-              code: 'PG_EXECUTOR_UNAVAILABLE',
-              message: 'No query connection available',
-              cause: this._lastFailure,
-              retryAfterMillis: Math.max(0, this._cooldownUntil - performance.now()),
-            }),
-          })
+      if (this._pending.size && !healthy) {
+        const retryAt = Math.min(...this._endpoints.map((endpoint) => endpoint.retryAt))
+        if (
+          performance.now() < retryAt ||
+          this._endpoints.every((endpoint) => endpoint.failedGeneration === this._generation)
+        ) {
+          for (const task of this._pending.values())
+            this._settle({
+              task,
+              error: this._error({
+                code: 'PG_EXECUTOR_UNAVAILABLE',
+                message: 'No query connection available',
+                cause: this._lastFailure,
+                retryAfterMillis: Math.max(0, retryAt - performance.now()),
+              }),
+            })
+        }
       }
       this._finish()
     } finally {
@@ -280,17 +356,18 @@ class QueryExecutor {
     }
   }
 
-  _open() {
+  _open(endpoint) {
     let client
     try {
-      client = new Client(this._options)
+      client = new Client({ ...this._options, ...endpoint.config })
       client.connectionParameters.query_timeout = 0
     } catch (cause) {
       this._lastFailure = cause
-      this._cooldownUntil = performance.now() + 100
-      return
+      endpoint.retryAt = performance.now() + 100
+      endpoint.failedGeneration = this._generation
+      return false
     }
-    const record = { client, state: 'connecting', tasks: new Set() }
+    const record = { client, endpoint, state: 'connecting', tasks: new Set(), openedAt: performance.now() }
     this._records.add(record)
     client.on('error', (cause) => this._connectionFailed({ record, cause }))
     client.on('end', () => {
@@ -305,10 +382,7 @@ class QueryExecutor {
           this._connectionFailed({ record, cause })
           return
         }
-        record.state = 'ready'
-        this._lastFailure = undefined
-        this._cooldownUntil = 0
-        process.nextTick(() => this._pump())
+        this._checkRole(record)
       })
       client.connection.on('readyForQuery', () => {
         if (record.state === 'ready' && client.getTransactionStatus() !== 'I') {
@@ -325,10 +399,62 @@ class QueryExecutor {
     } catch (cause) {
       this._connectionFailed({ record, cause })
     }
+    return true
+  }
+
+  _ready(record) {
+    if (record.state !== 'connecting') return
+    clearTimeout(record.timer)
+    record.state = 'ready'
+    record.endpoint.retryAt = 0
+    record.endpoint.failedGeneration = -1
+    this._lastFailure = undefined
+    process.nextTick(() => this._pump())
+  }
+
+  _checkRole(record) {
+    if (this._targetSessionAttrs === 'any') return this._ready(record)
+    const timeout = this._options.connectionTimeoutMillis
+    if (timeout) {
+      record.timer = setTimeout(
+        () => {
+          const cause = new Error('Connection role check timed out')
+          cause.code = 'PG_EXECUTOR_ROLE_TIMEOUT'
+          this._connectionFailed({ record, cause })
+        },
+        Math.max(1, timeout - (performance.now() - record.openedAt))
+      )
+    }
+    record.client.query({
+      text: 'SHOW transaction_read_only',
+      queryMode: 'extended',
+      query_timeout: 0,
+      rowMode: 'array',
+      types: { getTypeParser: () => (value) => value },
+      callback: (cause, result) => {
+        if (record.state !== 'connecting') return
+        if (cause) return this._connectionFailed({ record, cause })
+        const expected = this._targetSessionAttrs === 'read-write' ? 'off' : 'on'
+        if (result.rows[0]?.[0] !== expected) {
+          const failure = new Error('Endpoint does not match targetSessionAttrs')
+          failure.code = 'PG_EXECUTOR_ROLE_MISMATCH'
+          return this._connectionFailed({ record, cause: failure })
+        }
+        this._ready(record)
+      },
+    })
   }
 
   _complete({ record, task, error, result }) {
     if (task.state === 'done') return
+    if (error?.code === '25006' && this._targetSessionAttrs === 'read-write') {
+      this._settle({
+        task,
+        error: this._error({ code: error.code, message: error.message, outcome: 'server-error', cause: error }),
+      })
+      this._connectionFailed({ record, cause: error })
+      return
+    }
     if (
       error &&
       (!(error instanceof DatabaseError) ||
@@ -360,6 +486,7 @@ class QueryExecutor {
       })
       return
     }
+    if (!error) this._generation++
     this._settle({
       task,
       result,
@@ -373,7 +500,8 @@ class QueryExecutor {
   _connectionFailed({ record, cause }) {
     if (record.state === 'closing') return
     this._lastFailure = cause
-    this._cooldownUntil = performance.now() + 100
+    record.endpoint.retryAt = performance.now() + 100
+    record.endpoint.failedGeneration = this._generation
     this._discard({
       record,
       error: this._error({
@@ -386,6 +514,7 @@ class QueryExecutor {
   }
 
   _discard({ record, task, error }) {
+    clearTimeout(record.timer)
     if (record.state === 'closing') {
       record.client.connection.stream.destroy()
       return
