@@ -7,12 +7,14 @@ const path = require('path')
 const { execFileSync, spawnSync } = require('child_process')
 
 class CloudRun {
-  constructor({ base, head, tlsBase, output, mode }) {
+  constructor({ base, head, tlsBase, budgetBase, output, mode }) {
     assert.ok(['measure', 'smoke'].includes(mode))
     this.base = path.resolve(base)
     this.head = path.resolve(head)
     assert.ok(tlsBase, 'A checkout before TLS record grouping is required')
     this.tlsBase = path.resolve(tlsBase)
+    assert.ok(budgetBase, 'The initial bounded-result checkout is required')
+    this.budgetBase = path.resolve(budgetBase)
     this.poolerPort = Number(process.env.PG_BENCH_POOLER_PORT)
     assert.ok(Number.isInteger(this.poolerPort) && this.poolerPort > 0 && this.poolerPort <= 65535)
     this.output = path.resolve(output)
@@ -74,7 +76,14 @@ class CloudRun {
 
   runPhase(phase) {
     const before = this.snapshot()
-    const base = phase.profile === 'executor' ? this.head : phase.base === 'tls-before' ? this.tlsBase : this.base
+    const base =
+      phase.profile === 'executor'
+        ? this.head
+        : phase.base === 'tls-before'
+        ? this.tlsBase
+        : phase.base === 'budget-initial'
+        ? this.budgetBase
+        : this.base
     const stem = path.join(this.output, phase.name)
     const measured = this.mode === 'measure'
     const command = [
@@ -171,6 +180,14 @@ class CloudRun {
         duration: 3,
       },
       {
+        name: 'budget-context-bulk',
+        profile: 'executor-regression',
+        scenario: '500-row SELECT, 16 concurrent',
+        base: 'budget-initial',
+        rounds: 8,
+        duration: 3,
+      },
+      {
         name: 'overhead-update',
         profile: 'executor-regression',
         scenario: 'logged UPDATE, 16 concurrent',
@@ -223,6 +240,7 @@ new CloudRun({
   base: process.argv[2],
   head: process.argv[3],
   tlsBase: process.argv[6],
+  budgetBase: process.argv[7],
   output: process.argv[4],
   mode: process.argv[5] || 'measure',
 })

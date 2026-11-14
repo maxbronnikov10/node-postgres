@@ -46,7 +46,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 7315ebb06c486343659f787fa23828fc74972679
+          ref: fdba8c23136b567a9d8b9245736595ab95268997
           path: head
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -127,8 +127,13 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 7315ebb06c486343659f787fa23828fc74972679
+          ref: fdba8c23136b567a9d8b9245736595ab95268997
           path: head
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 7315ebb06c486343659f787fa23828fc74972679
+          path: budget-base
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -143,6 +148,7 @@ jobs:
             base/yarn.lock
             head/yarn.lock
             tls-base/yarn.lock
+            budget-base/yarn.lock
       - name: Existing native build dependency
         run: |
           sudo apt-get update -qq
@@ -151,7 +157,7 @@ jobs:
         run: |
           corepack enable
           corepack prepare yarn@1.22.22 --activate
-          for arm in base head tls-base; do
+          for arm in base head tls-base budget-base; do
             (cd "$arm" && yarn install --frozen-lockfile --non-interactive && yarn build)
           done
       - name: Configure disposable verified TLS
@@ -176,7 +182,7 @@ jobs:
       - name: Measure paired actors and retain raw rounds
         env:
           PG_BENCH_POOLER_PORT: '6432'
-        run: node harness/benchmark/cloud-run.js base head results/trial-${{ matrix.trial }} measure tls-base
+        run: node harness/benchmark/cloud-run.js base head results/trial-${{ matrix.trial }} measure tls-base budget-base
       - name: Remove disposable pooler
         if: always()
         run: |
@@ -194,4 +200,80 @@ jobs:
         with:
           name: reproducible-trial-${{ matrix.trial }}-${{ github.run_attempt }}
           path: results/trial-${{ matrix.trial }}
+          retention-days: 1
+
+  packages:
+    needs: regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      rw:
+        image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: nodepg_ha
+        ports: ['32774:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: fdba8c23136b567a9d8b9245736595ab95268997
+          path: head
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.22.1'
+          cache: yarn
+          cache-dependency-path: head/yarn.lock
+      - name: Existing native build dependency
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libpq-dev
+      - name: Build candidate
+        working-directory: head
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          yarn install --frozen-lockfile --non-interactive
+          yarn build
+      - name: Build coordinated experimental packages
+        working-directory: head
+        run: |
+          node benchmark/package-build.js ../results/packages
+          node benchmark/package-build.js ../results/repeated-packages
+          node - <<'NODE'
+          const fs = require('fs')
+          const assert = require('assert/strict')
+          const first = JSON.parse(fs.readFileSync('../results/packages/manifest.json'))
+          const second = JSON.parse(fs.readFileSync('../results/repeated-packages/manifest.json'))
+          for (const name of Object.keys(first.packages))
+            assert.equal(first.packages[name].sha256, second.packages[name].sha256)
+          console.log('All eight tarballs are byte-reproducible')
+          NODE
+      - name: Check isolated CommonJS and ESM consumer
+        working-directory: head
+        run: node benchmark/package-check.js ../results/packages ../consumer
+      - name: Check optional native artifact with normal libpq build
+        working-directory: head
+        run: |
+          node - <<'NODE'
+          const fs = require('fs')
+          const path = require('path')
+          const { execFileSync } = require('child_process')
+          const manifest = JSON.parse(fs.readFileSync('../results/packages/manifest.json'))
+          const consumer = path.resolve('../consumer')
+          execFileSync('npm', ['install', '--no-audit', '--no-fund', path.resolve('../results/packages', manifest.packages['pg-native'].filename)], { cwd: consumer, stdio: 'inherit', timeout: 180000 })
+          const check = `const assert = require('assert/strict'); const pg = require('pg');
+          const client = new pg.native.Client({host:process.env.PGHOST,port:Number(process.env.PGPORT),user:process.env.PGUSER,database:process.env.PGDATABASE,connectionTimeoutMillis:5000});
+          const timer=setTimeout(()=>process.exit(1),15000);
+          (async()=>{try{await client.connect();assert.deepEqual((await client.query('SELECT 17 AS value')).rows,[{value:17}]);assert.deepEqual((await client.query('SELECT $1::int AS value',[-16909061])).rows,[{value:-16909061}]);console.log('PASS optional native packaged consumer')}finally{await client.end();clearTimeout(timer)}})().catch(error=>{console.error(error);process.exitCode=1});`
+          fs.writeFileSync(path.join(consumer, 'native-check.cjs'), check)
+          execFileSync(process.execPath, [path.join(consumer, 'native-check.cjs')], { cwd: consumer, stdio: 'inherit', timeout: 20000 })
+          NODE
+      - name: Retain coordinated package set
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coordinated-packages-${{ github.run_attempt }}
+          path: results/packages
           retention-days: 1
