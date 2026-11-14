@@ -8,10 +8,11 @@ const READ = 'SELECT id, value FROM benchmark_executor_rows WHERE id = $1'
 const WRITE = 'UPDATE benchmark_executor_rows SET value = $1 WHERE id = $2 RETURNING id, value'
 
 class ExecutorWorkload {
-  constructor({ pg, arm, options, maxPending }) {
+  constructor({ pg, arm, options, setupOptions, maxPending }) {
     this.pg = pg
     this.arm = arm
     this.options = options
+    this.setupOptions = setupOptions
     this.serial = 0
     this.warmed = false
     this.resource =
@@ -21,11 +22,26 @@ class ExecutorWorkload {
     this.all = {}
     this.addCase({ name: 'independent SELECT, sequential', kind: 'read', count: 1 })
     this.addCase({ name: 'independent SELECT, 16 concurrent', kind: 'read', count: 16 })
+    this.addCase({ name: '500-row SELECT, 16 concurrent', kind: 'bulk', count: 16 })
     this.addCase({ name: 'fresh SQL SELECT, 16 concurrent', kind: 'fresh', count: 16 })
     this.addCase({ name: 'logged UPDATE, 16 concurrent', kind: 'write', count: 16 })
   }
 
   query({ kind = 'read', index = 0 } = {}) {
+    if (kind === 'bulk') {
+      return this.resource
+        .query({ name: 'executor_bulk', text: 'SELECT id, value FROM benchmark_executor_rows ORDER BY id LIMIT 500' })
+        .then((result) => {
+          assert.equal(result.rowCount, 500)
+          assert.equal(result.rows.length, 500)
+          assert.equal(result.fields.length, 2)
+          for (let i = 0; i < result.rows.length; i++) {
+            assert.equal(result.rows[i].id, i + 1)
+            assert.equal(result.rows[i].value, 7)
+          }
+          return 1
+        })
+    }
     const id = kind === 'write' ? this.arm * 32 + index + 1 : 42
     const config = {
       text: kind === 'write' ? WRITE : kind === 'fresh' ? `${READ} -- executor_${this.serial++}` : READ,
@@ -116,7 +132,7 @@ class ExecutorWorkload {
   }
 
   async setup() {
-    const client = new this.pg.Client(this.options)
+    const client = new this.pg.Client(this.setupOptions)
     try {
       await client.connect()
       await client.query('DROP TABLE IF EXISTS benchmark_executor_rows')
@@ -151,6 +167,8 @@ const createExecutorWorkload = async ({ pg, arm, maxPending = 1024 }) => {
   const tls = process.env.PG_BENCH_TLS_CA ? createTlsConfig() : undefined
   const negotiation = process.env.PG_BENCH_NEGOTIATION || 'direct'
   if (tls) Object.assign(options, tls.options({ context: 'shared', negotiation }))
+  // Setup bypasses the measured relay: PgBouncer can reset TLS after a normal Terminate.
+  const setupOptions = { ...options }
   let proxy
   if (process.env.PG_BENCH_DELAY_MS !== undefined) {
     proxy = await new DelayedProxy({
@@ -162,7 +180,7 @@ const createExecutorWorkload = async ({ pg, arm, maxPending = 1024 }) => {
     options.port = proxy.port
   }
   try {
-    const workload = new ExecutorWorkload({ pg, arm, options, maxPending })
+    const workload = new ExecutorWorkload({ pg, arm, options, setupOptions, maxPending })
     Object.assign(workload, { tls, negotiation, proxy })
     return {
       all: workload.all,

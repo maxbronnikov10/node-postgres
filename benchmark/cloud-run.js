@@ -7,10 +7,14 @@ const path = require('path')
 const { execFileSync, spawnSync } = require('child_process')
 
 class CloudRun {
-  constructor({ base, head, output, mode }) {
+  constructor({ base, head, tlsBase, output, mode }) {
     assert.ok(['measure', 'smoke'].includes(mode))
     this.base = path.resolve(base)
     this.head = path.resolve(head)
+    assert.ok(tlsBase, 'A checkout before TLS record grouping is required')
+    this.tlsBase = path.resolve(tlsBase)
+    this.poolerPort = Number(process.env.PG_BENCH_POOLER_PORT)
+    assert.ok(Number.isInteger(this.poolerPort) && this.poolerPort > 0 && this.poolerPort <= 65535)
     this.output = path.resolve(output)
     this.mode = mode
     this.results = []
@@ -70,7 +74,7 @@ class CloudRun {
 
   runPhase(phase) {
     const before = this.snapshot()
-    const base = phase.profile === 'executor' ? this.head : this.base
+    const base = phase.profile === 'executor' ? this.head : phase.base === 'tls-before' ? this.tlsBase : this.base
     const stem = path.join(this.output, phase.name)
     const measured = this.mode === 'measure'
     const command = [
@@ -97,10 +101,17 @@ class CloudRun {
     const result = spawnSync(process.execPath, command, {
       env: {
         ...process.env,
+        PGPORT: phase.endpoint === 'pooler' ? String(this.poolerPort) : process.env.PGPORT,
+        PGDATABASE: phase.endpoint === 'pooler' ? 'nodepg_tls' : process.env.PGDATABASE,
         PG_BENCH_CHECKPOINT: '1',
         PG_BENCH_TLS_CA: phase.tls ? process.env.PG_HA_TLS_CA : undefined,
-        PG_BENCH_DELAY_MS: phase.tls ? '3' : undefined,
-        PG_BENCH_ENDPOINT: phase.tls ? 'GitHub VM, verified TLS1.3, relay3ms/direction' : 'GitHub VM, PostgreSQL TCP',
+        PG_BENCH_DELAY_MS: phase.delayMillis === undefined ? undefined : String(phase.delayMillis),
+        PG_BENCH_ENDPOINT:
+          phase.endpoint === 'pooler'
+            ? `GitHub VM, PgBouncer transaction, verified TLS1.3, ${
+                phase.delayMillis === undefined ? 'local TCP' : 'relay3ms/direction'
+              }`
+            : 'GitHub VM, PostgreSQL TCP',
       },
       encoding: 'utf8',
       timeout: 600000,
@@ -117,7 +128,11 @@ class CloudRun {
       assert.ok(samples.every((value) => Number.isFinite(value) && value > 0))
     }
     const row = report.rows[0]
-    const quality = row.noise <= 0.1 ? 'within 10% control band' : 'inconclusive: controls exceed 10%'
+    const quality = measured
+      ? row.noise <= 0.1
+        ? 'within 10% control band'
+        : 'inconclusive: controls exceed 10%'
+      : 'smoke: checks only, no performance inference'
     this.results.push({ name: phase.name, quality, report, before, after: this.snapshot() })
     fs.writeFileSync(path.join(this.output, 'run.json'), JSON.stringify(this.summary, null, 2) + '\n')
     process.stdout.write(
@@ -142,6 +157,20 @@ class CloudRun {
     this.database = await this.inspectDatabase()
     for (const phase of [
       {
+        name: 'overhead-point',
+        profile: 'executor-regression',
+        scenario: 'independent SELECT, 16 concurrent',
+        rounds: 8,
+        duration: 3,
+      },
+      {
+        name: 'overhead-rows',
+        profile: 'executor-regression',
+        scenario: '500-row SELECT, 16 concurrent',
+        rounds: 8,
+        duration: 3,
+      },
+      {
         name: 'overhead-update',
         profile: 'executor-regression',
         scenario: 'logged UPDATE, 16 concurrent',
@@ -149,20 +178,24 @@ class CloudRun {
         duration: 5,
       },
       {
-        name: 'tls-concurrent',
+        name: 'pgbouncer-concurrent',
         profile: 'executor',
         scenario: 'independent SELECT, 16 concurrent',
         rounds: 4,
         duration: 3,
         tls: true,
+        endpoint: 'pooler',
+        delayMillis: 3,
       },
       {
-        name: 'tls-sequential',
-        profile: 'executor',
-        scenario: 'independent SELECT, sequential',
+        name: 'pgbouncer-large-payload',
+        profile: 'tls-steady',
+        scenario: 'TLS steady, bytea 2 x 1 MiB',
         rounds: 4,
         duration: 3,
         tls: true,
+        endpoint: 'pooler',
+        base: 'tls-before',
       },
     ])
       this.runPhase(phase)
@@ -189,6 +222,7 @@ class CloudRun {
 new CloudRun({
   base: process.argv[2],
   head: process.argv[3],
+  tlsBase: process.argv[6],
   output: process.argv[4],
   mode: process.argv[5] || 'measure',
 })

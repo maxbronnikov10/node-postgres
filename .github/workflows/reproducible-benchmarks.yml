@@ -46,7 +46,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 5668408bcafe5f0ebfcdd214a02fddc2339061a1
+          ref: 7315ebb06c486343659f787fa23828fc74972679
           path: head
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -72,6 +72,24 @@ jobs:
         run: python3 harness/benchmark/cloud-bootstrap.py --rw "$RW_CONTAINER" --ro "$RO_CONTAINER" --tls-directory fixture-tls
       - name: Behavioral regression checks
         run: python3 harness/benchmark/cloud-regressions.py --head head --output results/regressions
+      - name: Configure transaction pooler with verified backend TLS
+        run: >-
+          python3 harness/benchmark/cloud-pgbouncer.py
+          --container nodepg-cloud-pgbouncer-${{ github.run_id }}-${{ github.run_attempt }}
+          --postgres-port 32774 --listen-port 6432 --tls-directory fixture-tls
+          --output results/regressions/pgbouncer-fixture.json
+      - name: Check TLS, backend replacement and prepared statements through PgBouncer
+        env:
+          PGPORT: '6432'
+          PGDATABASE: nodepg_tls
+          PG_BENCH_TLS_CA: ${{ env.PG_HA_TLS_CA }}
+          PG_BENCH_ENDPOINT: pgbouncer-transaction
+        run: node harness/benchmark/tls-check.js head > results/regressions/pgbouncer-check.log
+      - name: Remove disposable pooler
+        if: always()
+        run: |
+          fixture=nodepg-cloud-pgbouncer-${{ github.run_id }}-${{ github.run_attempt }}
+          if docker container inspect "$fixture" >/dev/null 2>&1; then docker rm -fv "$fixture"; fi
       - name: Retain regression evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -83,10 +101,10 @@ jobs:
   measurements:
     needs: regressions
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     strategy:
       fail-fast: false
-      max-parallel: 1
+      max-parallel: 3
       matrix:
         trial: [1, 2, 3]
     services:
@@ -104,13 +122,18 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 662beb7d0b258ef0503342a918783d0e9fc0ed70
+          ref: 2550426b2bcb0664d12aaeccbd1493be609e47dc
           path: base
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 5668408bcafe5f0ebfcdd214a02fddc2339061a1
+          ref: 7315ebb06c486343659f787fa23828fc74972679
           path: head
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: c0022e4fc848848656e74bdb2ada47ef9267bc9c
+          path: tls-base
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -119,6 +142,7 @@ jobs:
           cache-dependency-path: |
             base/yarn.lock
             head/yarn.lock
+            tls-base/yarn.lock
       - name: Existing native build dependency
         run: |
           sudo apt-get update -qq
@@ -127,15 +151,37 @@ jobs:
         run: |
           corepack enable
           corepack prepare yarn@1.22.22 --activate
-          for arm in base head; do
+          for arm in base head tls-base; do
             (cd "$arm" && yarn install --frozen-lockfile --non-interactive && yarn build)
           done
       - name: Configure disposable verified TLS
         env:
           RW_CONTAINER: ${{ job.services.rw.id }}
         run: python3 harness/benchmark/cloud-bootstrap.py --rw "$RW_CONTAINER" --tls-directory fixture-tls
+      - name: Configure verified TLS transaction pooler
+        run: >-
+          python3 harness/benchmark/cloud-pgbouncer.py
+          --container nodepg-cloud-pgbouncer-${{ github.run_id }}-${{ github.run_attempt }}
+          --postgres-port 32774 --listen-port 6432 --tls-directory fixture-tls
+          --output results/trial-${{ matrix.trial }}/pgbouncer-fixture.json
+      - name: Validate candidate and TLS baseline through the pooler
+        env:
+          PGPORT: '6432'
+          PGDATABASE: nodepg_tls
+          PG_BENCH_TLS_CA: ${{ env.PG_HA_TLS_CA }}
+          PG_BENCH_ENDPOINT: pgbouncer-transaction
+        run: |
+          node harness/benchmark/tls-check.js tls-base > results/trial-${{ matrix.trial }}/tls-base-check.log
+          node harness/benchmark/tls-check.js head > results/trial-${{ matrix.trial }}/head-check.log
       - name: Measure paired actors and retain raw rounds
-        run: node harness/benchmark/cloud-run.js base head results/trial-${{ matrix.trial }} measure
+        env:
+          PG_BENCH_POOLER_PORT: '6432'
+        run: node harness/benchmark/cloud-run.js base head results/trial-${{ matrix.trial }} measure tls-base
+      - name: Remove disposable pooler
+        if: always()
+        run: |
+          fixture=nodepg-cloud-pgbouncer-${{ github.run_id }}-${{ github.run_attempt }}
+          if docker container inspect "$fixture" >/dev/null 2>&1; then docker rm -fv "$fixture"; fi
       - name: Publish measurement quality
         if: always()
         run: |

@@ -23,6 +23,11 @@ class Fixture:
             "-days", "2", "-subj", "/CN=nodepg-cloud-benchmark-ca",
         ])
         self.run([
+            "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+            "-keyout", str(self.directory / "untrusted.key"), "-out", str(self.directory / "untrusted.crt"),
+            "-days", "2", "-subj", "/CN=nodepg-untrusted-benchmark-ca",
+        ])
+        self.run([
             "openssl", "req", "-newkey", "rsa:2048", "-nodes",
             "-keyout", str(self.directory / "server.key"), "-out", str(self.directory / "server.csr"),
             "-subj", "/CN=localhost",
