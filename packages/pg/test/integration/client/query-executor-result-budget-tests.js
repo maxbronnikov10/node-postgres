@@ -439,3 +439,24 @@ suite.test('oversized result metadata is rejected before application type parser
     await fixture.close()
   }
 })
+
+suite.test('cancellation during parameter encoding safely releases the constructed query', async () => {
+  const fixture = new BudgetFixture({ maxResultRows: 1, maxResultBytes: 57 })
+  const controller = new AbortController()
+  const parameter = {
+    toPostgres() {
+      controller.abort(new Error('cancel during encoding'))
+      return 1
+    },
+  }
+  try {
+    await assert.rejects(
+      fixture.executor.query({ text: 'SELECT $1::int AS value', values: [parameter], signal: controller.signal }),
+      { code: 'PG_EXECUTOR_ABORTED', outcome: 'unknown', safeToRetry: false }
+    )
+
+    assert.deepStrictEqual((await fixture.recover()).rows, [{ value: 7 }])
+  } finally {
+    await fixture.close()
+  }
+})

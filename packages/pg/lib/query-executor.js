@@ -262,12 +262,11 @@ class QueryExecutor {
     else task.resolve(result)
   }
 
-  _consumeResult({ task, query, message }) {
+  _consumeResult({ task, query }, message) {
     if (task.state !== 'assigned' || task.record.state !== 'ready') {
       query._discardResult(task.resultError)
       return false
     }
-    task.resultQuery = query
     const rows = message.name === 'dataRow' ? 1 : 0
     const bytes = message.length + 1
     const exceedsRows = rows > this._maxResultRows - this._resultRows
@@ -346,7 +345,11 @@ class QueryExecutor {
           record.client.query({
             ...task.config,
             query_timeout: 0,
-            [resultBudget]: (query, message) => this._consumeResult({ task, query, message }),
+            [resultBudget]: (query) => {
+              task.resultQuery = query
+              const context = { task, query }
+              return (message) => this._consumeResult(context, message)
+            },
             callback: (error, result) => this._complete({ record, task, error, result }),
           })
         } catch (cause) {

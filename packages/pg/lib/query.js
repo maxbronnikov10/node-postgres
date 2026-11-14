@@ -31,7 +31,7 @@ class Query extends EventEmitter {
     // potential for multiple results
     this._results = this._result
     this._canceledDueToError = false
-    this._resultBudget = config[resultBudget]
+    this._resultBudget = config[resultBudget]?.(this)
   }
 
   requiresPreparation() {
@@ -76,7 +76,7 @@ class Query extends EventEmitter {
   // message with this query object
   // metadata used when parsing row results
   handleRowDescription(msg) {
-    if (this._resultBudget && !this._resultBudget(this, msg)) return
+    if (this._resultBudget && !this._resultBudget(msg)) return
     this._checkForMultirow()
     this._result.addFields(msg.fields)
     this._accumulateRows = this.callback || !this.listeners('row').length
@@ -88,7 +88,7 @@ class Query extends EventEmitter {
     if (this._canceledDueToError) {
       return
     }
-    if (this._resultBudget && !this._resultBudget(this, msg)) return
+    if (this._resultBudget && !this._resultBudget(msg)) return
 
     try {
       row = msg.buffer ? this._result.parseRawRow(msg) : this._result.parseRow(msg.fields)
@@ -111,7 +111,7 @@ class Query extends EventEmitter {
   }
 
   handleCommandComplete(msg, connection) {
-    if (this._resultBudget && !this._resultBudget(this, msg)) return
+    if (this._resultBudget && !this._resultBudget(msg)) return
     this._checkForMultirow()
     this._result.addCommandComplete(msg)
     // need to sync after each command complete of a prepared statement
