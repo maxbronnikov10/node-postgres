@@ -44,10 +44,12 @@ class RegressionRun:
 
     def run(self):
         package = self.root / "packages/pg"
-        files = subprocess.check_output(
-            ["rg", "--files", "test/unit", "test/integration", "-g", "*-tests.js"],
-            cwd=package, text=True,
-        ).splitlines()
+        files = [
+            str(file.relative_to(package))
+            for directory in ("test/unit", "test/integration")
+            for file in (package / directory).rglob("*-tests.js")
+            if file.is_file()
+        ]
         for name in sorted(files):
             self.check(name, package, ["node", name])
         mocha = str(self.root / "node_modules/.bin/mocha")
