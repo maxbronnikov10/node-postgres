@@ -1,0 +1,151 @@
+name: Reproducible benchmarks
+
+on:
+  push:
+    branches: [ci/reproducible-benchmarks-20261114]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nodepg-repro-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PGHOST: 127.0.0.1
+  PGPORT: '32774'
+  PGUSER: postgres
+  PGDATABASE: nodepg_ha
+  PG_HA_RO_PORT: '32775'
+  PG_HA_TLS_CA: ${{ github.workspace }}/fixture-tls/ca.crt
+
+jobs:
+  regressions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      rw:
+        image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: nodepg_ha
+        ports: ['32774:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+      ro:
+        image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: nodepg_ha
+        ports: ['32775:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 5668408bcafe5f0ebfcdd214a02fddc2339061a1
+          path: head
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.22.1'
+          cache: yarn
+          cache-dependency-path: head/yarn.lock
+      - name: Existing native test dependency
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libpq-dev
+      - name: Build candidate
+        working-directory: head
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          yarn install --frozen-lockfile --non-interactive
+          yarn build
+      - name: Configure disposable TLS and read-only fixtures
+        env:
+          RW_CONTAINER: ${{ job.services.rw.id }}
+          RO_CONTAINER: ${{ job.services.ro.id }}
+        run: python3 harness/benchmark/cloud-bootstrap.py --rw "$RW_CONTAINER" --ro "$RO_CONTAINER" --tls-directory fixture-tls
+      - name: Behavioral regression checks
+        run: python3 harness/benchmark/cloud-regressions.py --head head --output results/regressions
+      - name: Retain regression evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: reproducible-regressions-${{ github.run_attempt }}
+          path: results/regressions
+          retention-days: 1
+
+  measurements:
+    needs: regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        trial: [1, 2, 3]
+    services:
+      rw:
+        image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: nodepg_ha
+        ports: ['32774:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 662beb7d0b258ef0503342a918783d0e9fc0ed70
+          path: base
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 5668408bcafe5f0ebfcdd214a02fddc2339061a1
+          path: head
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.22.1'
+          cache: yarn
+          cache-dependency-path: |
+            base/yarn.lock
+            head/yarn.lock
+      - name: Existing native build dependency
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libpq-dev
+      - name: Independently install and build both arms
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          for arm in base head; do
+            (cd "$arm" && yarn install --frozen-lockfile --non-interactive && yarn build)
+          done
+      - name: Configure disposable verified TLS
+        env:
+          RW_CONTAINER: ${{ job.services.rw.id }}
+        run: python3 harness/benchmark/cloud-bootstrap.py --rw "$RW_CONTAINER" --tls-directory fixture-tls
+      - name: Measure paired actors and retain raw rounds
+        run: node harness/benchmark/cloud-run.js base head results/trial-${{ matrix.trial }} measure
+      - name: Publish measurement quality
+        if: always()
+        run: |
+          if test -f results/trial-${{ matrix.trial }}/summary.md; then
+            cat results/trial-${{ matrix.trial }}/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Retain raw data and host metadata
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: reproducible-trial-${{ matrix.trial }}-${{ github.run_attempt }}
+          path: results/trial-${{ matrix.trial }}
+          retention-days: 1
