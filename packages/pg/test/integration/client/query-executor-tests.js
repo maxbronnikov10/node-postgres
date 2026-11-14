@@ -7,6 +7,20 @@ if (helper.args.native) return
 const QueryExecutorFaultProxy = require('./query-executor-fault-proxy')
 const { QueryExecutor, QueryExecutorError } = helper.pg
 const suite = new helper.Suite('bounded independent-query executor')
+
+if (typeof require('events').addAbortListener !== 'function') {
+  suite.test('an unsupported executor leaves ordinary Client queries available', async () => {
+    assert.throws(() => new QueryExecutor(), { code: 'PG_EXECUTOR_UNSUPPORTED' })
+    const client = new helper.pg.Client()
+    try {
+      await client.connect()
+      assert.deepStrictEqual((await client.query('SELECT 17 AS value')).rows, [{ value: 17 }])
+    } finally {
+      await client.end()
+    }
+  })
+  return
+}
 let fixtureId = 0
 
 class ExecutorFixture {

@@ -40,6 +40,17 @@ jobs:
         ports:
           - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      postgres_ro:
+        image: ghcr.io/railwayapp-templates/postgres-ssl:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: 'md5'
+          POSTGRES_DB: ci_db_test
+          PGDATA: /var/lib/postgresql/data
+        ports:
+          - 5433:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     strategy:
       fail-fast: false
       matrix:
@@ -63,6 +74,8 @@ jobs:
       PGUSER: postgres
       PGPASSWORD: postgres
       PGHOST: localhost
+      PGPORT: 5432
+      PG_HA_RO_PORT: 5433
       PGDATABASE: ci_db_test
       PGTESTNOSSL: 'true'
       SCRAM_TEST_PGUSER: scram_test
@@ -83,6 +96,11 @@ jobs:
             -c "SET password_encryption = 'scram-sha-256'" \
             -c "CREATE ROLE scram_test LOGIN PASSWORD 'test4scram'" \
             -c "CREATE ROLE scram_unicode_test LOGIN PASSWORD U&'IX-\2168'"
+      - name: Configure read-only HA fixture
+        run: >-
+          docker exec ${{ job.services.postgres_ro.id }}
+          psql -U postgres -d ci_db_test
+          -c "ALTER DATABASE ci_db_test SET default_transaction_read_only = on"
       - uses: actions/checkout@v4
         with:
           persist-credentials: false

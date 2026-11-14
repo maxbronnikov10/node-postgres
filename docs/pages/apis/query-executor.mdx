@@ -41,6 +41,8 @@ strings, TLS, type parsers and prepared-statement options, plus these limits:
 | `query_timeout`            | `30000`    | Query deadline in milliseconds, including queue and connection wait.           |
 | `connectionTimeoutMillis`  | `5000`     | Timeout in milliseconds for each connection attempt.                           |
 | `maxMessageSize`           | `16777216` | Maximum inbound message length, including its four-byte length field.          |
+| `maxResultRows`            | `100000`   | Maximum rows held across all unfinished application queries.                   |
+| `maxResultBytes`           | `67108864` | Maximum result wire bytes held across all unfinished application queries.      |
 | `targetSessionAttrs`       | `'any'`    | Required default transaction access: `'any'`, `'read-write'` or `'read-only'`. |
 
 Limits must be positive safe integers. Timeouts must be integers from `0` to
@@ -51,9 +53,8 @@ The executor manages `pipeline: true` and `autoBatch: false`. An explicit
 `pipeline: false` or enabled `autoBatch` is rejected. These defaults are starting
 points for application sizing, not universal throughput settings.
 
-The queue is FIFO; assignment chooses the least loaded ready client. These limits
-bound query counts, not payload bytes or result memory. Choose limits appropriate
-for the size of your parameters and results. An executor belongs to one JavaScript
+The queue is FIFO; assignment chooses the least loaded ready client. Choose limits
+appropriate for your parameters and results. An executor belongs to one JavaScript
 event loop; limits are not shared across workers or processes.
 
 TLS options retain normal certificate verification. An application may explicitly
@@ -111,8 +112,32 @@ message's declared length, including the length field and excluding the tag byte
 Oversized headers and truncated messages close the transport with PG_PROTOCOL_ERROR.
 Assigned SQL then has an unknown outcome. A larger explicit cap is available for
 large fields. Multiple valid messages can share a chunk whose combined size exceeds
-the cap. This limit does not bound total result rows or JavaScript heap usage;
-many small rows can still form a large eager Result.
+the cap. Use the separate result budgets to bound accumulation across messages.
+
+### Buffered result budgets
+
+`maxResultRows` and `maxResultBytes` are positive safe integers shared by all
+unfinished application queries in this executor. RowDescription, DataRow and
+CommandComplete frames count toward the byte budget, including each frame's tag
+and length word. Each DataRow counts as one row, including nulls and empty fields;
+bytes use the original wire encoding, so UTF-8 and binary values retain their
+actual byte sizes. Limits are checked before application type parsers and Result
+row construction. The protocol's fast text path can already have decoded one
+bounded message from UTF-8; rejected frames do not enter the Result.
+
+At a limit, the triggering query rejects with `PG_EXECUTOR_RESULT_LIMIT`, outcome
+`'unknown'` and `safeToRetry: false`. The shared connection is discarded, its
+assigned siblings also have unknown outcomes, and partial results are released.
+Assigned SQL is never replayed. This includes writes with RETURNING: a result
+limit does not establish whether the write committed. Other connections can
+continue; accepted unsent work can use a replacement connection.
+
+Budget accounting is released on completion, error, cancellation or timeout.
+Completed Results held by the caller, input parameters, custom type-parser
+allocations and protocol control/error messages fall outside these budgets.
+Wire-byte accounting is not a JavaScript heap-size guarantee; the per-message
+limit still applies to individual frames. Ordinary Client and Pool behavior is
+unchanged.
 
 ## executor.query
 
@@ -173,7 +198,7 @@ Errors expose `code`, `outcome`, `safeToRetry` and the original `cause`, when pr
 Local errors use `PG_EXECUTOR_INVALID`, `PG_EXECUTOR_OVERLOADED`,
 `PG_EXECUTOR_UNAVAILABLE`, `PG_EXECUTOR_CLOSED`, `PG_EXECUTOR_DESTROYED`,
 `PG_EXECUTOR_ABORTED`, `PG_EXECUTOR_TIMEOUT`, `PG_EXECUTOR_TRANSACTION` or
-`PG_EXECUTOR_UNKNOWN`. Abort and timeout outcomes depend on whether assignment
+`PG_EXECUTOR_RESULT_LIMIT` or `PG_EXECUTOR_UNKNOWN`. Abort and timeout outcomes depend on whether assignment
 has occurred. Collateral failures use a generic transport error, not another
 query's abort reason.
 

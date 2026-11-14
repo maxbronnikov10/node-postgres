@@ -4,6 +4,7 @@ const events = require('events')
 const Client = require('./client')
 const { DatabaseError } = require('pg-protocol')
 const { parse: parseConnectionString } = require('pg-connection-string')
+const resultBudget = require('./query-result-budget')
 
 class QueryExecutorError extends Error {
   constructor({ message, code, outcome, cause, retryAfterMillis }) {
@@ -27,7 +28,9 @@ class QueryExecutor {
     this._max = options.max ?? 4
     this._perConnection = options.maxInFlightPerConnection ?? 16
     this._maxPending = options.maxPending ?? 1024
-    for (const value of [this._max, this._perConnection, this._maxPending]) {
+    this._maxResultRows = options.maxResultRows ?? 100000
+    this._maxResultBytes = options.maxResultBytes ?? 67108864
+    for (const value of [this._max, this._perConnection, this._maxPending, this._maxResultRows, this._maxResultBytes]) {
       if (!Number.isSafeInteger(value) || value <= 0) {
         throw this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Executor limits must be positive safe integers' })
       }
@@ -71,12 +74,16 @@ class QueryExecutor {
     delete this._options.max
     delete this._options.maxInFlightPerConnection
     delete this._options.maxPending
+    delete this._options.maxResultRows
+    delete this._options.maxResultBytes
     delete this._options.connectionString
     delete this._options.endpoints
     delete this._options.targetSessionAttrs
     this._records = new Set()
     this._pending = new Map()
     this._inFlight = 0
+    this._resultRows = 0
+    this._resultBytes = 0
     this._state = 'open'
     this._lastFailure = undefined
     this._pumping = false
@@ -202,6 +209,8 @@ class QueryExecutor {
         resolve,
         reject,
         state: 'queued',
+        resultRows: 0,
+        resultBytes: 0,
         deadline: prepared.timeout ? performance.now() + prepared.timeout : 0,
       }
       try {
@@ -235,6 +244,11 @@ class QueryExecutor {
 
   _settle({ task, error, result }) {
     if (task.state === 'done') return
+    if (error) task.resultQuery?._discardResult(error)
+    this._resultRows -= task.resultRows
+    this._resultBytes -= task.resultBytes
+    task.resultError = error
+    task.resultQuery = undefined
     if (task.state === 'assigned') {
       task.record.tasks.delete(task)
       this._inFlight--
@@ -246,6 +260,34 @@ class QueryExecutor {
     task.abortListener?.[Symbol.dispose]()
     if (error) task.reject(error)
     else task.resolve(result)
+  }
+
+  _consumeResult({ task, query, message }) {
+    if (task.state !== 'assigned' || task.record.state !== 'ready') {
+      query._discardResult(task.resultError)
+      return false
+    }
+    task.resultQuery = query
+    const rows = message.name === 'dataRow' ? 1 : 0
+    const bytes = message.length + 1
+    const exceedsRows = rows > this._maxResultRows - this._resultRows
+    if (exceedsRows || bytes > this._maxResultBytes - this._resultBytes) {
+      this._discard({
+        record: task.record,
+        task,
+        error: this._error({
+          code: 'PG_EXECUTOR_RESULT_LIMIT',
+          message: `Executor buffered result ${exceedsRows ? 'row' : 'byte'} limit exceeded`,
+          outcome: 'unknown',
+        }),
+      })
+      return false
+    }
+    this._resultRows += rows
+    this._resultBytes += bytes
+    task.resultRows += rows
+    task.resultBytes += bytes
+    return true
   }
 
   _abort(task) {
@@ -304,6 +346,7 @@ class QueryExecutor {
           record.client.query({
             ...task.config,
             query_timeout: 0,
+            [resultBudget]: (query, message) => this._consumeResult({ task, query, message }),
             callback: (error, result) => this._complete({ record, task, error, result }),
           })
         } catch (cause) {

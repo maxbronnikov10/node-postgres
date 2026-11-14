@@ -4,6 +4,7 @@ const { EventEmitter } = require('events')
 
 const Result = require('./result')
 const utils = require('./utils')
+const resultBudget = require('./query-result-budget')
 
 class Query extends EventEmitter {
   constructor(config, values, callback) {
@@ -30,6 +31,7 @@ class Query extends EventEmitter {
     // potential for multiple results
     this._results = this._result
     this._canceledDueToError = false
+    this._resultBudget = config[resultBudget]
   }
 
   requiresPreparation() {
@@ -74,6 +76,7 @@ class Query extends EventEmitter {
   // message with this query object
   // metadata used when parsing row results
   handleRowDescription(msg) {
+    if (this._resultBudget && !this._resultBudget(this, msg)) return
     this._checkForMultirow()
     this._result.addFields(msg.fields)
     this._accumulateRows = this.callback || !this.listeners('row').length
@@ -85,6 +88,7 @@ class Query extends EventEmitter {
     if (this._canceledDueToError) {
       return
     }
+    if (this._resultBudget && !this._resultBudget(this, msg)) return
 
     try {
       row = msg.buffer ? this._result.parseRawRow(msg) : this._result.parseRow(msg.fields)
@@ -93,13 +97,21 @@ class Query extends EventEmitter {
       return
     }
 
+    if (this._canceledDueToError) return
     this.emit('row', row, this._result)
     if (this._accumulateRows) {
       this._result.addRow(row)
     }
   }
 
+  _discardResult(error) {
+    this._canceledDueToError = error
+    this._result = null
+    this._results = null
+  }
+
   handleCommandComplete(msg, connection) {
+    if (this._resultBudget && !this._resultBudget(this, msg)) return
     this._checkForMultirow()
     this._result.addCommandComplete(msg)
     // need to sync after each command complete of a prepared statement

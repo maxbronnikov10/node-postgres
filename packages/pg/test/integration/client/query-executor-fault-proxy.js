@@ -58,6 +58,8 @@ class QueryExecutorFaultProxy {
       upstream.pipe(frontend, { end: this.mode === 'relay' })
       return
     }
+    const heldResult = []
+    let heldBytes = 0
     let startupReady = false
     let pending = Buffer.alloc(0)
     const maxFrameLength = 1024 * 1024
@@ -77,6 +79,25 @@ class QueryExecutorFaultProxy {
         if (offset + 1 + length > pending.length) break
         const frame = pending.subarray(offset, offset + 1 + length)
         offset += 1 + length
+        if (this.mode === 'gate-result' && startupReady && !this.dropped) {
+          heldBytes += frame.length
+          if (heldBytes > maxFrameLength * 2) {
+            this.failure = new Error('Fault proxy held result exceeded its fixture bound')
+            return close()
+          }
+          heldResult.push(Buffer.from(frame))
+          if (frame[0] === 90) {
+            this.dropped = true
+            this._releaseResult = () => {
+              frontend.write(Buffer.concat(heldResult))
+              heldResult.length = 0
+              heldBytes = 0
+              this._releaseResult = null
+            }
+            this.server.emit('resultHeld')
+          }
+          continue
+        }
         if (frame[0] === 90) {
           if (startupReady && !this.dropped) {
             this.dropped = true
@@ -94,6 +115,11 @@ class QueryExecutorFaultProxy {
       pending = pending.subarray(offset)
     })
     upstream.on('end', () => frontend.end())
+  }
+
+  releaseResult() {
+    if (!this._releaseResult) throw new Error('No result is held')
+    this._releaseResult()
   }
 
   async close() {

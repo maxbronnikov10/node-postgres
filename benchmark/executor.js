@@ -21,11 +21,26 @@ class ExecutorWorkload {
     this.all = {}
     this.addCase({ name: 'independent SELECT, sequential', kind: 'read', count: 1 })
     this.addCase({ name: 'independent SELECT, 16 concurrent', kind: 'read', count: 16 })
+    this.addCase({ name: '500-row SELECT, 16 concurrent', kind: 'bulk', count: 16 })
     this.addCase({ name: 'fresh SQL SELECT, 16 concurrent', kind: 'fresh', count: 16 })
     this.addCase({ name: 'logged UPDATE, 16 concurrent', kind: 'write', count: 16 })
   }
 
   query({ kind = 'read', index = 0 } = {}) {
+    if (kind === 'bulk') {
+      return this.resource
+        .query({ name: 'executor_bulk', text: 'SELECT id, value FROM benchmark_executor_rows ORDER BY id LIMIT 500' })
+        .then((result) => {
+          assert.equal(result.rowCount, 500)
+          assert.equal(result.rows.length, 500)
+          assert.equal(result.fields.length, 2)
+          for (let i = 0; i < result.rows.length; i++) {
+            assert.equal(result.rows[i].id, i + 1)
+            assert.equal(result.rows[i].value, 7)
+          }
+          return 1
+        })
+    }
     const id = kind === 'write' ? this.arm * 32 + index + 1 : 42
     const config = {
       text: kind === 'write' ? WRITE : kind === 'fresh' ? `${READ} -- executor_${this.serial++}` : READ,

@@ -3,13 +3,14 @@
 const assert = require('assert')
 const helper = require('./test-helper')
 if (helper.args.native) return
+if (typeof require('events').addAbortListener !== 'function') return
 const QueryExecutorFaultProxy = require('./query-executor-fault-proxy')
 const { QueryExecutor, QueryExecutorError } = helper.pg
 const suite = new helper.Suite('independent-query executor endpoint failover')
-const rw = { host: '127.0.0.1', port: 32774 }
+const rw = { host: helper.config.host, port: Number(process.env.PG_HA_RW_PORT || helper.config.port) }
 // This fixture uses default_transaction_read_only=on, not a physical replica.
-const ro = { host: '127.0.0.1', port: 32775 }
-const common = { user: 'postgres', database: 'nodepg_ha', ssl: false }
+const ro = { host: helper.config.host, port: Number(process.env.PG_HA_RO_PORT || 32775) }
+const common = { ...helper.config, ssl: false }
 let fixtureId = 0
 
 class FailoverFixture {
@@ -269,8 +270,12 @@ suite.test('lost ReadyForQuery after commit is unknown and failover never replay
 suite.test('explicit endpoint overrides the refused host and port in connectionString', async () => {
   const closed = await new QueryExecutorFaultProxy({ mode: 'blackhole' }).start()
   await closed.close()
+  const connectionString = new URL(`postgres://127.0.0.2:${closed.port}`)
+  connectionString.username = common.user
+  connectionString.password = common.password
+  connectionString.pathname = `/${encodeURIComponent(common.database)}`
   const fixture = new FailoverFixture({
-    connectionString: `postgres://postgres@127.0.0.2:${closed.port}/nodepg_ha`,
+    connectionString: connectionString.toString(),
     endpoints: [rw],
   })
   await fixture.connect()
