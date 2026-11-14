@@ -25,7 +25,10 @@ of assigned SQL. Exclusive session/transaction work uses a separate ownership pa
    remain required before claiming bounded result handling.
 4. Exercise an actual standby promotion and loss during writes. Measure recovery,
    verify durable markers and ensure assigned operations are not replayed.
-   This evidence remains outstanding; the read-only fixture does not substitute.
+   Two real physical-standby experiments now pass, including primary SIGKILL,
+   manual promotion and fresh work through the same executor. Seed WAL is explicitly
+   replayed first; these experiments do not establish automatic election or zero RPO.
+   See [external results and physical evidence](github-results-2026-11-14.md).
 5. Compare performance before/after reliability changes with equal frontend counts,
    validated results and duplicate same-code controls. Preserve negative and
    inconclusive results. Role probes are connection-time overhead, not free work.
@@ -38,6 +41,10 @@ of assigned SQL. Exclusive session/transaction work uses a separate ownership pa
 
 `321c5dc1` adds per-message bounds/EOF checks and endpoint selection/recovery.
 `bd15d6bb` adds TLS endpoint validation and a before/after executor benchmark.
-Remaining gates are result budgets, physical standby promotion, the final broader
-recovery/performance audit and the refreshed delivery artifact. The goal remains
-active while those are unproven. Additional speculative features are not gates.
+Physical standby promotion now has two passing reproductions. The balanced GitHub
+run passes 997 regression cases and three fresh-VM benchmark jobs; raw rounds and
+negative/inconclusive findings are preserved in the linked report. Remaining gates
+are result budgets, the final broader recovery/performance audit and the refreshed
+delivery artifact. The ordinary CI matrix still needs its HA fixtures configured.
+The goal remains active while those are unproven. Additional speculative features
+are not gates.

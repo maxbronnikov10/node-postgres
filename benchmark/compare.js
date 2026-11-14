@@ -29,7 +29,7 @@ const parseArgs = (argv) => {
     const name = argv[i].slice(2)
     if (
       !argv[i].startsWith('--') ||
-      !['base', 'head', 'rounds', 'duration', 'warmup', 'output', 'profile'].includes(name)
+      !['base', 'head', 'rounds', 'duration', 'warmup', 'output', 'profile', 'scenario', 'json-output'].includes(name)
     ) {
       throw new Error(`unknown argument: ${argv[i]}`)
     }
@@ -174,7 +174,7 @@ const main = async () => {
   const args = parseArgs(process.argv.slice(2))
   if (!args.base || !args.head) {
     throw new Error(
-      'usage: node benchmark/compare.js --base <dir> --head <dir> [--rounds 4] [--duration 3] [--output file] [--profile regression|ablation|queue|payload|autocommit|autocommit-prepare|autocommit-pipeline|tls-handshake|tls-steady|rows|row-formats|executor]'
+      'usage: node benchmark/compare.js --base <dir> --head <dir> [--rounds 4] [--duration 3] [--output file] [--json-output file] [--scenario label] [--profile regression|ablation|queue|payload|autocommit|autocommit-prepare|autocommit-pipeline|tls-handshake|tls-steady|rows|row-formats|executor]'
     )
   }
   const rounds = Number(args.rounds || 4)
@@ -228,19 +228,23 @@ const main = async () => {
     const ready = await Promise.all(names.map((name) => arms[name].ready))
     const { scenarios } = ready[0]
     for (const arm of ready) assert.deepEqual(arm.scenarios, scenarios)
+    if (args.scenario && !scenarios.includes(args.scenario)) {
+      throw new Error(`unknown scenario: ${args.scenario}; available: ${scenarios.join('; ')}`)
+    }
     await arms.base.send({ type: 'setup' })
 
     const ratio = (qps, over, under) => qps[over].map((value, i) => value / qps[under][i])
     const rows = []
-    for (const scenario of scenarios) {
+    for (const scenario of args.scenario ? [args.scenario] : scenarios) {
       process.stderr.write(`${scenario}\n`)
       const qps = Object.fromEntries(names.map((name) => [name, []]))
+      const orders = []
       for (let i = -1; i < rounds; i++) {
         // the first round is a warmup on cold code and is thrown away
         const ms = (i < 0 ? warmup : duration) * 1000
-        // rotates one place per round and flips on odd rounds, so each arm sees every position
-        const rotated = names.map((_, k) => names[(k + i + 1) % names.length])
-        const order = i % 2 ? rotated.reverse() : rotated
+        // Rotating one place per round gives each arm every position across four rounds.
+        const order = names.map((_, k) => names[(k + i + 1) % names.length])
+        if (i >= 0) orders.push(order)
         for (const arm of order) {
           const reply = await arms[arm].send({ type: 'run', scenario, ms })
           if (i >= 0) qps[arm].push(reply.qps)
@@ -264,10 +268,43 @@ const main = async () => {
         max,
         noise,
         notable: Math.abs(speedup - 1) >= Math.max(noise, FLOOR) && (min > 1 || max < 1),
+        samples: qps,
+        orders,
       })
     }
     await Promise.all(names.map((name) => arms[name].send({ type: 'end' })))
     ended = true
+
+    if (args['json-output']) {
+      const checkouts = Object.fromEntries(
+        ['base', 'head'].map((name) => {
+          const [commit, tree] = execFileSync('git', ['-C', args[name], 'rev-parse', 'HEAD', 'HEAD^{tree}'], {
+            encoding: 'utf8',
+          })
+            .trim()
+            .split('\n')
+          return [name, { commit, tree }]
+        })
+      )
+      fs.writeFileSync(
+        args['json-output'],
+        JSON.stringify(
+          {
+            schemaVersion: 1,
+            profile,
+            rounds,
+            durationSeconds: duration,
+            warmupSeconds: warmup,
+            node: process.version,
+            cpu: { model: os.cpus()[0]?.model || 'unknown cpu', cores: os.cpus().length },
+            checkouts,
+            rows,
+          },
+          null,
+          2
+        ) + '\n'
+      )
+    }
 
     const summary = markdown({ labels, rows, rounds, duration, profile })
     process.stdout.write(summary)

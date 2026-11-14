@@ -1,0 +1,782 @@
+[
+  {
+    "name": "test/integration/client/api-tests.js",
+    "exit": 0,
+    "cases": 14,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/appname-tests.js",
+    "exit": 0,
+    "cases": 6,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/array-tests.js",
+    "exit": 0,
+    "cases": 14,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/async-stack-trace-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/auto-batch-tests.js",
+    "exit": 0,
+    "cases": 7,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/auto-prepare-tests.js",
+    "exit": 0,
+    "cases": 5,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/batch-tests.js",
+    "exit": 0,
+    "cases": 10,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/big-simple-query-tests.js",
+    "exit": 0,
+    "cases": 4,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/combined-optimizations-tests.js",
+    "exit": 0,
+    "cases": 5,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/configuration-tests.js",
+    "exit": 0,
+    "cases": 4,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/connection-parameter-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/connection-timeout-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/custom-types-tests.js",
+    "exit": 0,
+    "cases": 3,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/empty-query-tests.js",
+    "exit": 0,
+    "cases": 3,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/error-handling-tests.js",
+    "exit": 0,
+    "cases": 15,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/error-identity-tests.js",
+    "exit": 0,
+    "cases": 25,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/field-name-escape-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/huge-numeric-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/idle_in_transaction_session_timeout-tests.js",
+    "exit": 0,
+    "cases": 4,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/json-type-parsing-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/multiple-results-tests.js",
+    "exit": 0,
+    "cases": 4,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/network-partition-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/no-data-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/no-row-result-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/notice-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/optimization-semantics-tests.js",
+    "exit": 0,
+    "cases": 7,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/parse-int-8-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/pipeline-portal-tests.js",
+    "exit": 0,
+    "cases": 4,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/pipelining-tests.js",
+    "exit": 0,
+    "cases": 9,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/prepared-statement-tests.js",
+    "exit": 0,
+    "cases": 12,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/promise-api-tests.js",
+    "exit": 0,
+    "cases": 3,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/protocol-limits-tests.js",
+    "exit": 0,
+    "cases": 13,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/query-as-promise-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/query-column-names-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/query-error-handling-prepared-statement-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/query-error-handling-tests.js",
+    "exit": 0,
+    "cases": 3,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/query-executor-failover-tests.js",
+    "exit": 0,
+    "cases": 15,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/query-executor-tests.js",
+    "exit": 0,
+    "cases": 27,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/quick-disconnect-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/raw-row-tests.js",
+    "exit": 0,
+    "cases": 5,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/result-metadata-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/results-as-array-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/row-description-on-results-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/sasl-scram-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/simple-query-tests.js",
+    "exit": 0,
+    "cases": 7,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/ssl-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/statement_timeout-tests.js",
+    "exit": 0,
+    "cases": 5,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/timezone-tests.js",
+    "exit": 0,
+    "cases": 3,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/transaction-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/txstatus-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/type-coercion-tests.js",
+    "exit": 0,
+    "cases": 16,
+    "failed": false
+  },
+  {
+    "name": "test/integration/client/type-parser-override-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/connection-pool/connection-pool-size-tests.js",
+    "exit": 0,
+    "cases": 4,
+    "failed": false
+  },
+  {
+    "name": "test/integration/connection-pool/error-tests.js",
+    "exit": 0,
+    "cases": 5,
+    "failed": false
+  },
+  {
+    "name": "test/integration/connection-pool/idle-timeout-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/connection-pool/native-instance-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/connection-pool/tls-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/connection-pool/yield-support-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/domain-tests.js",
+    "exit": 0,
+    "cases": 3,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/1105-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/130-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/131-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/1382-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/1542-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/1854-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/199-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/1992-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2056-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2064-tests.js",
+    "exit": 0,
+    "cases": 3,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2079-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2085-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2108-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2303-tests.js",
+    "exit": 0,
+    "cases": 5,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2307-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2416-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2556-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2627-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2716-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/2862-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/3062-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/3174-tests.js",
+    "exit": 0,
+    "cases": 24,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/3487-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/3772-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/507-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/600-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/675-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/699-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/787-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/882-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/integration/gh-issues/981-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/batch-tests.js",
+    "exit": 0,
+    "cases": 7,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/cleartext-password-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/configuration-tests.js",
+    "exit": 0,
+    "cases": 12,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/early-disconnect-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/escape-tests.js",
+    "exit": 0,
+    "cases": 48,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/md5-password-tests.js",
+    "exit": 0,
+    "cases": 4,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/notification-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/password-callback-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/pipeline-backpressure-tests.js",
+    "exit": 0,
+    "cases": 11,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/prepared-statement-tests.js",
+    "exit": 0,
+    "cases": 11,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/query-queue-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/query-timeout-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/raw-row-tests.js",
+    "exit": 0,
+    "cases": 13,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/result-metadata-tests.js",
+    "exit": 0,
+    "cases": 7,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/sasl-scram-tests.js",
+    "exit": 0,
+    "cases": 34,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/set-keepalives-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/simple-query-tests.js",
+    "exit": 0,
+    "cases": 29,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/stream-and-query-error-interaction-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/throw-in-bind-tests.js",
+    "exit": 0,
+    "cases": 3,
+    "failed": false
+  },
+  {
+    "name": "test/unit/client/throw-in-type-parser-tests.js",
+    "exit": 0,
+    "cases": 3,
+    "failed": false
+  },
+  {
+    "name": "test/unit/connection-parameters/creation-tests.js",
+    "exit": 0,
+    "cases": 30,
+    "failed": false
+  },
+  {
+    "name": "test/unit/connection-parameters/environment-variable-tests.js",
+    "exit": 0,
+    "cases": 13,
+    "failed": false
+  },
+  {
+    "name": "test/unit/connection-pool/configuration-tests.js",
+    "exit": 0,
+    "cases": 1,
+    "failed": false
+  },
+  {
+    "name": "test/unit/connection/error-tests.js",
+    "exit": 0,
+    "cases": 11,
+    "failed": false
+  },
+  {
+    "name": "test/unit/connection/ssl-tests.js",
+    "exit": 0,
+    "cases": 5,
+    "failed": false
+  },
+  {
+    "name": "test/unit/connection/startup-tests.js",
+    "exit": 0,
+    "cases": 8,
+    "failed": false
+  },
+  {
+    "name": "test/unit/result-tests.js",
+    "exit": 0,
+    "cases": 7,
+    "failed": false
+  },
+  {
+    "name": "test/unit/utils-tests.js",
+    "exit": 0,
+    "cases": 57,
+    "failed": false
+  },
+  {
+    "name": "protocol",
+    "exit": 0,
+    "cases": 126,
+    "failed": false
+  },
+  {
+    "name": "pool",
+    "exit": 0,
+    "cases": 93,
+    "failed": false
+  },
+  {
+    "name": "cursor",
+    "exit": 0,
+    "cases": 43,
+    "failed": false
+  },
+  {
+    "name": "stream",
+    "exit": 0,
+    "cases": 40,
+    "failed": false
+  },
+  {
+    "name": "native-callback-api-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "native-evented-api-tests.js",
+    "exit": 0,
+    "cases": 8,
+    "failed": false
+  },
+  {
+    "name": "native-native-connection-string-tests.js",
+    "exit": 0,
+    "cases": 2,
+    "failed": false
+  },
+  {
+    "name": "native-native-vs-js-error-tests.js",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "native-stress-tests.js",
+    "exit": 0,
+    "cases": 3,
+    "failed": false
+  },
+  {
+    "name": "workerd",
+    "exit": 0,
+    "cases": 3,
+    "failed": false
+  },
+  {
+    "name": "endpoint-tls",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  },
+  {
+    "name": "benchmark-cli",
+    "exit": 0,
+    "cases": 0,
+    "failed": false
+  }
+]

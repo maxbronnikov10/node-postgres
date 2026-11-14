@@ -1,5 +1,11 @@
 # Endpoint recovery and protocol bounds, 2026-11-14
 
+Follow-up: [balanced GitHub measurements and two physical-standby experiments](github-results-2026-11-14.md)
+supersede the performance/recovery evidence below where they overlap. Earlier
+performance runs used an actor scheduler with confounded odd/even positions and
+remain exploratory. Physical promotion now passes; result budgets and the broader
+delivery audit remain open.
+
 Runtime: `321c5dc1`; benchmark/check harness: `bd15d6bb`.
 [Public contract](../docs/pages/apis/query-executor.mdx),
 [verification data](validation-ha-2026-11-14.json),

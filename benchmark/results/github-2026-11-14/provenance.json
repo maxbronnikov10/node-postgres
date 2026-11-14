@@ -1,0 +1,107 @@
+{
+  "repository": "maxbronnikov10/node-postgres",
+  "baseline": {
+    "commit": "662beb7d0b258ef0503342a918783d0e9fc0ed70",
+    "tree": "0d45f95dc5b3c3efc0ef491887358f00416d29f4",
+    "localCommit": "c33d6cac56ababc369ea6c24ec6e6c289a1fff0d"
+  },
+  "candidate": {
+    "commit": "5668408bcafe5f0ebfcdd214a02fddc2339061a1",
+    "tree": "ce6c175709ea7245b532762677f7fd885834034e",
+    "localCommit": "c1950bee3ff982b0e7daa0fbe66234c5f1c5d553"
+  },
+  "harness": {
+    "commit": "fbd4c0260c3653519662f3e330f7cd9a1a56a486",
+    "tree": "dc6abc5793da6c65ce386591cd8a8c1183596ca9"
+  },
+  "runId": 43633165056,
+  "supersededRuns": [
+    {
+      "id": 43631552627,
+      "reason": "runner depended on missing rg; no tests or benchmarks"
+    },
+    {
+      "id": 43632016346,
+      "reason": "pgpass fixture permissions failed; no benchmarks"
+    },
+    {
+      "id": 43632411079,
+      "reason": "measurement actor positions confounded; cancelled and excluded; regression job passed997 verified cases",
+      "regressionArtifactSha256": "f01c16507494fe9ebf6501a18f6ff94a02bff27d2e1e6d2727cdc749be08e98d"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 14130041148,
+      "name": "reproducible-trial-3-1",
+      "sizeInBytes": 11691,
+      "sha256": "3c26c8e3df5b646ea3bcec86a56e621590deef6dbfe0d52fa3326f8125f3f6eb",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43633165056/artifacts/14130041148",
+      "expiresAt": "2026-11-15T19:59:08Z"
+    },
+    {
+      "id": 14129651245,
+      "name": "reproducible-trial-2-1",
+      "sizeInBytes": 11857,
+      "sha256": "c0c23397ae3dbef77b8a0b7ac37a827c3b72985ec72b4f4b4538f01bfa0c6b38",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43633165056/artifacts/14129651245",
+      "expiresAt": "2026-11-15T19:52:56Z"
+    },
+    {
+      "id": 14129171412,
+      "name": "reproducible-regressions-1",
+      "sizeInBytes": 48561,
+      "sha256": "90ce367cee84faf59b15478a8ac9ed3775ed100216887a1c3b2ebd35ae16cd99",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43633165056/artifacts/14129171412",
+      "expiresAt": "2026-11-15T19:40:18Z"
+    },
+    {
+      "id": 14128779342,
+      "name": "reproducible-trial-1-1",
+      "sizeInBytes": 11832,
+      "sha256": "5c9de7f4d2231360a6f43e7c53ff707c118a2638c8f8e6e5adc981c658597195",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43633165056/artifacts/14128779342",
+      "expiresAt": "2026-11-15T19:46:39Z"
+    }
+  ],
+  "regressions": {
+    "commands": 130,
+    "reportedCases": 997,
+    "pendingPoolCases": 1,
+    "optionalScramRolesConfigured": false
+  },
+  "runtimePackagesUnchangedSinceMeasuredCandidate": true,
+  "physical": {
+    "location": "local Docker; independent from GitHub timing",
+    "repetitions": 2,
+    "manualPromotion": true,
+    "tls": false,
+    "temporaryResourcesRemoved": true
+  },
+  "preservedFiles": [
+    {
+      "path": "physical-1.json",
+      "sha256": "9711d1fca2f0a6688f3879cefaa0f9af6269412db1ecc83c19523cc662d9426d"
+    },
+    {
+      "path": "physical-2.json",
+      "sha256": "a1ecebccd6f94983f218d401c39d56842c6bf0507df34f84b99a65450f2575ef"
+    },
+    {
+      "path": "regressions.json",
+      "sha256": "7bb3f61df14db83b89ab4c228a93f007e212bb759dd81510b4a5eb1ed27a707b"
+    },
+    {
+      "path": "trial-1.json",
+      "sha256": "5cc9ff5155ad91ffc503c826ef3aac065cb31ff96e6d11d19b7d31c40f00a7a7"
+    },
+    {
+      "path": "trial-2.json",
+      "sha256": "a5abfc40a6f603092429382b94229ce3dd764505790dcc8d8705f1144fbbd671"
+    },
+    {
+      "path": "trial-3.json",
+      "sha256": "b56c4515271b8b21fa085f8b2ce0c932b9853a657d2bc53694bc40785eaad669"
+    }
+  ]
+}

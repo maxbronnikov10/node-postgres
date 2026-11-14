@@ -1,0 +1,452 @@
+{
+  "mode": "measure",
+  "runId": "43633165056",
+  "runAttempt": "1",
+  "job": "measurements",
+  "node": "v22.22.1",
+  "database": {
+    "version": "PostgreSQL 18.7 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "fsync": "on",
+    "full_page_writes": "on",
+    "synchronous_commit": "on",
+    "checkpoint_timeout": "5min"
+  },
+  "results": [
+    {
+      "name": "overhead-update",
+      "quality": "inconclusive: controls exceed 10%",
+      "report": {
+        "schemaVersion": 1,
+        "profile": "executor-regression",
+        "rounds": 8,
+        "durationSeconds": 5,
+        "warmupSeconds": 2,
+        "node": "v22.22.1",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor",
+          "cores": 4
+        },
+        "checkouts": {
+          "base": {
+            "commit": "662beb7d0b258ef0503342a918783d0e9fc0ed70",
+            "tree": "0d45f95dc5b3c3efc0ef491887358f00416d29f4"
+          },
+          "head": {
+            "commit": "5668408bcafe5f0ebfcdd214a02fddc2339061a1",
+            "tree": "ce6c175709ea7245b532762677f7fd885834034e"
+          }
+        },
+        "rows": [
+          {
+            "name": "logged UPDATE, 16 concurrent",
+            "base": 10420.251897450737,
+            "head": 10796.893005230933,
+            "speedup": 1.0286333132845695,
+            "min": 0.9916277993820467,
+            "max": 1.2018002892136788,
+            "noise": 0.21760931836245057,
+            "notable": false,
+            "samples": {
+              "base": [
+                10720.654099802865,
+                10568.492572051044,
+                10408.631474759548,
+                10431.872320141925,
+                10747.450814463025,
+                9409.022496268952,
+                9006.095126223508,
+                10335.967567800966
+              ],
+              "head": [
+                10939.763568987426,
+                10830.896879651345,
+                10571.725515190778,
+                10770.258283080553,
+                10657.471000112755,
+                10583.162386557402,
+                10823.527727381315,
+                10870.007005766714
+              ],
+              "base2": [
+                10658.208179121475,
+                10903.994284344084,
+                10283.66357084938,
+                10582.375558945409,
+                10775.808226625179,
+                10721.017014390174,
+                10965.905347748394,
+                10992.684627521088
+              ],
+              "head2": [
+                10911.802171208998,
+                10465.505749739681,
+                10588.635012124694,
+                10750.369613994859,
+                10893.692232305262,
+                10789.073906294918,
+                10766.886223761338,
+                10673.176382834896
+              ]
+            },
+            "orders": [
+              [
+                "head",
+                "base2",
+                "head2",
+                "base"
+              ],
+              [
+                "base2",
+                "head2",
+                "base",
+                "head"
+              ],
+              [
+                "head2",
+                "base",
+                "head",
+                "base2"
+              ],
+              [
+                "base",
+                "head",
+                "base2",
+                "head2"
+              ],
+              [
+                "head",
+                "base2",
+                "head2",
+                "base"
+              ],
+              [
+                "base2",
+                "head2",
+                "base",
+                "head"
+              ],
+              [
+                "head2",
+                "base",
+                "head",
+                "base2"
+              ],
+              [
+                "base",
+                "head",
+                "base2",
+                "head2"
+              ]
+            ]
+          }
+        ]
+      },
+      "before": {
+        "time": "2026-11-14T19:41:50.988Z",
+        "load": [
+          3.07,
+          1.16,
+          0.43
+        ],
+        "freeMemory": 15531446272,
+        "totalMemory": 16760344576,
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "cores": 4,
+        "platform": "linux",
+        "kernel": "7.0.0-1017-azure",
+        "virtualization": "Virtual Machine\n",
+        "pressure": {
+          "cpu": "some avg10=6.01 avg60=3.54 avg300=1.24 total=4968174\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+          "io": "some avg10=20.37 avg60=23.40 avg300=8.40 total=29718290\nfull avg10=19.57 avg60=22.16 avg300=7.92 total=28045265\n",
+          "memory": "some avg10=0.00 avg60=0.00 avg300=0.00 total=421\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=204\n"
+        },
+        "disk": "   7       0 loop0 10 0 20 1 0 0 0 0 0 1 1 0 0 0 0 0 0\n   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       2 loop2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       3 loop3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       4 loop4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       5 loop5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       6 loop6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       7 loop7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n 259       0 nvme0n1 18936 8052 1722550 16540 106794 107856 16560811 1814395 0 48262 1831066 601 0 469320 127 19 3\n 259       1 nvme0n1p1 18188 8018 1685598 16379 106756 107827 16560448 1814386 0 52620 1830892 598 0 440640 126 0 0\n 259       2 nvme0n1p14 182 0 1952 31 0 0 0 0 0 31 31 0 0 0 0 0 0\n 259       3 nvme0n1p15 207 0 17144 52 1 0 1 0 0 43 52 0 0 0 0 0 0\n 259       4 nvme0n1p16 192 34 13472 41 25 21 258 6 0 32 48 3 0 28680 0 0 0\n"
+      },
+      "after": {
+        "time": "2026-11-14T19:44:40.742Z",
+        "load": [
+          4.78,
+          2.76,
+          1.17
+        ],
+        "freeMemory": 15664373760,
+        "totalMemory": 16760344576,
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "cores": 4,
+        "platform": "linux",
+        "kernel": "7.0.0-1017-azure",
+        "virtualization": "Virtual Machine\n",
+        "pressure": {
+          "cpu": "some avg10=22.75 avg60=21.53 avg300=10.68 total=44236710\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+          "io": "some avg10=13.21 avg60=13.93 avg300=10.53 total=52991712\nfull avg10=9.09 avg60=9.99 avg300=8.45 total=44166141\n",
+          "memory": "some avg10=0.00 avg60=0.00 avg300=0.00 total=421\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=204\n"
+        },
+        "disk": "   7       0 loop0 10 0 20 1 0 0 0 0 0 1 1 0 0 0 0 0 0\n   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       2 loop2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       3 loop3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       4 loop4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       5 loop5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       6 loop6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       7 loop7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n 259       0 nvme0n1 18938 8052 1722606 16541 1129561 109967 33785595 1960123 0 144372 1976802 634 0 470040 134 19 3\n 259       1 nvme0n1p1 18190 8018 1685654 16379 1129523 109938 33785232 1960114 0 148758 1976628 631 0 441360 133 0 0\n 259       2 nvme0n1p14 182 0 1952 31 0 0 0 0 0 31 31 0 0 0 0 0 0\n 259       3 nvme0n1p15 207 0 17144 52 1 0 1 0 0 43 52 0 0 0 0 0 0\n 259       4 nvme0n1p16 192 34 13472 41 25 21 258 6 0 32 48 3 0 28680 0 0 0\n"
+      }
+    },
+    {
+      "name": "tls-concurrent",
+      "quality": "within 10% control band",
+      "report": {
+        "schemaVersion": 1,
+        "profile": "executor",
+        "rounds": 4,
+        "durationSeconds": 3,
+        "warmupSeconds": 2,
+        "node": "v22.22.1",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor",
+          "cores": 4
+        },
+        "checkouts": {
+          "base": {
+            "commit": "5668408bcafe5f0ebfcdd214a02fddc2339061a1",
+            "tree": "ce6c175709ea7245b532762677f7fd885834034e"
+          },
+          "head": {
+            "commit": "5668408bcafe5f0ebfcdd214a02fddc2339061a1",
+            "tree": "ce6c175709ea7245b532762677f7fd885834034e"
+          }
+        },
+        "rows": [
+          {
+            "name": "independent SELECT, 16 concurrent",
+            "base": 555.9947825883776,
+            "head": 2231.6652920182382,
+            "speedup": 3.994587626257199,
+            "min": 3.8327119972831163,
+            "max": 4.388865376421681,
+            "noise": 0.03761933104589077,
+            "notable": true,
+            "samples": {
+              "base": [
+                557.668968065033,
+                554.3205971117221,
+                593.8965761896187,
+                508.8236318429191
+              ],
+              "head": [
+                2230.1721635359563,
+                2211.78269229985,
+                2276.234532707318,
+                2233.15842050052
+              ],
+              "base2": [
+                550.5275853904338,
+                566.1702270825409,
+                571.5545842829204,
+                510.5938947057399
+              ],
+              "head2": [
+                2249.472392530331,
+                2227.9484628483115,
+                2226.7315748843635,
+                2240.968820963645
+              ]
+            },
+            "orders": [
+              [
+                "head",
+                "base2",
+                "head2",
+                "base"
+              ],
+              [
+                "base2",
+                "head2",
+                "base",
+                "head"
+              ],
+              [
+                "head2",
+                "base",
+                "head",
+                "base2"
+              ],
+              [
+                "base",
+                "head",
+                "base2",
+                "head2"
+              ]
+            ]
+          }
+        ]
+      },
+      "before": {
+        "time": "2026-11-14T19:44:40.743Z",
+        "load": [
+          4.78,
+          2.76,
+          1.17
+        ],
+        "freeMemory": 15664373760,
+        "totalMemory": 16760344576,
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "cores": 4,
+        "platform": "linux",
+        "kernel": "7.0.0-1017-azure",
+        "virtualization": "Virtual Machine\n",
+        "pressure": {
+          "cpu": "some avg10=22.75 avg60=21.53 avg300=10.68 total=44236710\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+          "io": "some avg10=13.21 avg60=13.93 avg300=10.53 total=52991712\nfull avg10=9.09 avg60=9.99 avg300=8.45 total=44166141\n",
+          "memory": "some avg10=0.00 avg60=0.00 avg300=0.00 total=421\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=204\n"
+        },
+        "disk": "   7       0 loop0 10 0 20 1 0 0 0 0 0 1 1 0 0 0 0 0 0\n   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       2 loop2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       3 loop3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       4 loop4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       5 loop5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       6 loop6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       7 loop7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n 259       0 nvme0n1 18938 8052 1722606 16541 1129561 109967 33785595 1960123 0 144372 1976802 634 0 470040 134 19 3\n 259       1 nvme0n1p1 18190 8018 1685654 16379 1129523 109938 33785232 1960114 0 148758 1976628 631 0 441360 133 0 0\n 259       2 nvme0n1p14 182 0 1952 31 0 0 0 0 0 31 31 0 0 0 0 0 0\n 259       3 nvme0n1p15 207 0 17144 52 1 0 1 0 0 43 52 0 0 0 0 0 0\n 259       4 nvme0n1p16 192 34 13472 41 25 21 258 6 0 32 48 3 0 28680 0 0 0\n"
+      },
+      "after": {
+        "time": "2026-11-14T19:45:40.125Z",
+        "load": [
+          1.94,
+          2.31,
+          1.11
+        ],
+        "freeMemory": 15663513600,
+        "totalMemory": 16760344576,
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "cores": 4,
+        "platform": "linux",
+        "kernel": "7.0.0-1017-azure",
+        "virtualization": "Virtual Machine\n",
+        "pressure": {
+          "cpu": "some avg10=1.67 avg60=12.06 avg300=10.19 total=49427648\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+          "io": "some avg10=0.03 avg60=5.18 avg300=8.59 total=53011211\nfull avg10=0.02 avg60=3.71 avg300=6.88 total=44185082\n",
+          "memory": "some avg10=0.00 avg60=0.00 avg300=0.00 total=421\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=204\n"
+        },
+        "disk": "   7       0 loop0 10 0 20 1 0 0 0 0 0 1 1 0 0 0 0 0 0\n   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       2 loop2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       3 loop3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       4 loop4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       5 loop5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       6 loop6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       7 loop7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n 259       0 nvme0n1 18959 8052 1723526 16587 1129718 110238 33797715 1960206 0 144433 1976935 672 0 481112 138 19 3\n 259       1 nvme0n1p1 18211 8018 1686574 16425 1129680 110209 33797352 1960197 0 148820 1976761 669 0 452432 138 0 0\n 259       2 nvme0n1p14 182 0 1952 31 0 0 0 0 0 31 31 0 0 0 0 0 0\n 259       3 nvme0n1p15 207 0 17144 52 1 0 1 0 0 43 52 0 0 0 0 0 0\n 259       4 nvme0n1p16 192 34 13472 41 25 21 258 6 0 32 48 3 0 28680 0 0 0\n"
+      }
+    },
+    {
+      "name": "tls-sequential",
+      "quality": "inconclusive: controls exceed 10%",
+      "report": {
+        "schemaVersion": 1,
+        "profile": "executor",
+        "rounds": 4,
+        "durationSeconds": 3,
+        "warmupSeconds": 2,
+        "node": "v22.22.1",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor",
+          "cores": 4
+        },
+        "checkouts": {
+          "base": {
+            "commit": "5668408bcafe5f0ebfcdd214a02fddc2339061a1",
+            "tree": "ce6c175709ea7245b532762677f7fd885834034e"
+          },
+          "head": {
+            "commit": "5668408bcafe5f0ebfcdd214a02fddc2339061a1",
+            "tree": "ce6c175709ea7245b532762677f7fd885834034e"
+          }
+        },
+        "rows": [
+          {
+            "name": "independent SELECT, sequential",
+            "base": 142.98117309704176,
+            "head": 147.01418458624303,
+            "speedup": 1.0075456841991481,
+            "min": 0.9851629381282441,
+            "max": 1.0391707397211831,
+            "noise": 0.1788379033412647,
+            "notable": false,
+            "samples": {
+              "base": [
+                136.50421491155942,
+                141.06588891266392,
+                144.8964572814196,
+                153.41824289836813
+              ],
+              "head": [
+                134.47889342916113,
+                143.45621047637445,
+                150.57215869611161,
+                153.1339054148832
+              ],
+              "base2": [
+                133.67300579595445,
+                139.70226350912696,
+                150.68687754067952,
+                136.58552430261705
+              ],
+              "head2": [
+                137.01312256782938,
+                141.84795374577175,
+                146.38127003211045,
+                125.74775884002595
+              ]
+            },
+            "orders": [
+              [
+                "head",
+                "base2",
+                "head2",
+                "base"
+              ],
+              [
+                "base2",
+                "head2",
+                "base",
+                "head"
+              ],
+              [
+                "head2",
+                "base",
+                "head",
+                "base2"
+              ],
+              [
+                "base",
+                "head",
+                "base2",
+                "head2"
+              ]
+            ]
+          }
+        ]
+      },
+      "before": {
+        "time": "2026-11-14T19:45:40.126Z",
+        "load": [
+          1.94,
+          2.31,
+          1.11
+        ],
+        "freeMemory": 15663308800,
+        "totalMemory": 16760344576,
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "cores": 4,
+        "platform": "linux",
+        "kernel": "7.0.0-1017-azure",
+        "virtualization": "Virtual Machine\n",
+        "pressure": {
+          "cpu": "some avg10=1.67 avg60=12.06 avg300=10.19 total=49427648\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+          "io": "some avg10=0.03 avg60=5.18 avg300=8.59 total=53011211\nfull avg10=0.02 avg60=3.71 avg300=6.88 total=44185082\n",
+          "memory": "some avg10=0.00 avg60=0.00 avg300=0.00 total=421\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=204\n"
+        },
+        "disk": "   7       0 loop0 10 0 20 1 0 0 0 0 0 1 1 0 0 0 0 0 0\n   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       2 loop2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       3 loop3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       4 loop4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       5 loop5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       6 loop6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       7 loop7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n 259       0 nvme0n1 18959 8052 1723526 16587 1129719 110238 33797747 1960207 0 144434 1976936 673 0 481128 138 19 3\n 259       1 nvme0n1p1 18211 8018 1686574 16425 1129681 110209 33797384 1960197 0 148821 1976761 670 0 452448 138 0 0\n 259       2 nvme0n1p14 182 0 1952 31 0 0 0 0 0 31 31 0 0 0 0 0 0\n 259       3 nvme0n1p15 207 0 17144 52 1 0 1 0 0 43 52 0 0 0 0 0 0\n 259       4 nvme0n1p16 192 34 13472 41 25 21 258 6 0 32 48 3 0 28680 0 0 0\n"
+      },
+      "after": {
+        "time": "2026-11-14T19:46:38.926Z",
+        "load": [
+          1.09,
+          2.01,
+          1.08
+        ],
+        "freeMemory": 15653961728,
+        "totalMemory": 16760344576,
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "cores": 4,
+        "platform": "linux",
+        "kernel": "7.0.0-1017-azure",
+        "virtualization": "Virtual Machine\n",
+        "pressure": {
+          "cpu": "some avg10=0.00 avg60=4.63 avg300=8.36 total=49670844\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+          "io": "some avg10=0.00 avg60=1.97 avg300=7.03 total=53013425\nfull avg10=0.00 avg60=1.41 avg300=5.63 total=44187220\n",
+          "memory": "some avg10=0.00 avg60=0.00 avg300=0.00 total=421\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=204\n"
+        },
+        "disk": "   7       0 loop0 10 0 20 1 0 0 0 0 0 1 1 0 0 0 0 0 0\n   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       2 loop2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       3 loop3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       4 loop4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       5 loop5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       6 loop6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n   7       7 loop7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n 259       0 nvme0n1 18959 8052 1723526 16587 1129848 110369 33804275 1960228 0 144441 1976960 697 0 481504 142 19 3\n 259       1 nvme0n1p1 18211 8018 1686574 16425 1129810 110340 33803912 1960218 0 148828 1976786 694 0 452824 141 0 0\n 259       2 nvme0n1p14 182 0 1952 31 0 0 0 0 0 31 31 0 0 0 0 0 0\n 259       3 nvme0n1p15 207 0 17144 52 1 0 1 0 0 43 52 0 0 0 0 0 0\n 259       4 nvme0n1p16 192 34 13472 41 25 21 258 6 0 32 48 3 0 28680 0 0 0\n"
+      }
+    }
+  ]
+}

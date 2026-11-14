@@ -123,6 +123,7 @@ class ExecutorWorkload {
       await client.query('CREATE TABLE benchmark_executor_rows (id int PRIMARY KEY, value int NOT NULL)')
       await client.query('INSERT INTO benchmark_executor_rows SELECT i, 7 FROM generate_series(1, 1024) i')
       await client.query('ANALYZE benchmark_executor_rows')
+      if (process.env.PG_BENCH_CHECKPOINT === '1') await client.query('CHECKPOINT')
     } finally {
       await client.end()
     }
