@@ -238,12 +238,13 @@ const main = async () => {
     for (const scenario of args.scenario ? [args.scenario] : scenarios) {
       process.stderr.write(`${scenario}\n`)
       const qps = Object.fromEntries(names.map((name) => [name, []]))
+      const orders = []
       for (let i = -1; i < rounds; i++) {
         // the first round is a warmup on cold code and is thrown away
         const ms = (i < 0 ? warmup : duration) * 1000
-        // rotates one place per round and flips on odd rounds, so each arm sees every position
-        const rotated = names.map((_, k) => names[(k + i + 1) % names.length])
-        const order = i % 2 ? rotated.reverse() : rotated
+        // Rotating one place per round gives each arm every position across four rounds.
+        const order = names.map((_, k) => names[(k + i + 1) % names.length])
+        if (i >= 0) orders.push(order)
         for (const arm of order) {
           const reply = await arms[arm].send({ type: 'run', scenario, ms })
           if (i >= 0) qps[arm].push(reply.qps)
@@ -268,6 +269,7 @@ const main = async () => {
         noise,
         notable: Math.abs(speedup - 1) >= Math.max(noise, FLOOR) && (min > 1 || max < 1),
         samples: qps,
+        orders,
       })
     }
     await Promise.all(names.map((name) => arms[name].send({ type: 'end' })))

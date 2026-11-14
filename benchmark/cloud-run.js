@@ -138,6 +138,7 @@ class CloudRun {
   }
 
   async run() {
+    assert.ok(process.env.PG_HA_TLS_CA, 'PG_HA_TLS_CA is required for verified TLS benchmark phases')
     this.database = await this.inspectDatabase()
     for (const phase of [
       {

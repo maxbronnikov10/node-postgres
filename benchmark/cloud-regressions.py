@@ -27,13 +27,15 @@ class RegressionRun:
         except subprocess.TimeoutExpired as error:
             code, text = 124, (error.stdout or b"").decode(errors="replace")
         (self.output / (name.replace("/", "__") + ".log")).write_text(text)
+        text = re.sub(r"\x1b\[[0-9;]*m", "", text)
         match = re.search(r"(\d+) passing", text)
         tap = re.search(r"^# tests (\d+)$", text, re.M)
         cases = int(match[1]) if match else int(tap[1]) if tap else sum(
             "✔" in line and "skipping" not in line.lower() for line in text.splitlines()
         )
         if name == "workerd":
-            cases = 3 if re.search(r"Tests\s+3 passed", text) else 0
+            vitest = re.search(r"Tests\s+(\d+) passed", text)
+            cases = int(vitest[1]) if vitest else 0
         failed = code != 0 or "FAILED!" in text or bool(re.search(r"^not ok ", text, re.M))
         self.results.append({"name": name, "exit": code, "cases": cases, "failed": failed})
         (self.output / "checks.json").write_text(json.dumps(self.results, indent=2) + "\n")

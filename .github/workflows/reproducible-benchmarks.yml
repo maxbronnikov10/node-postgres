@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: nodepg-repro-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   PGHOST: 127.0.0.1
