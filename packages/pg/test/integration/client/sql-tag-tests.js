@@ -79,6 +79,42 @@ suite.test('deep sibling fragments preserve parameter order and literal dollar r
   }
 })
 
+suite.test('one tagged callsite keeps scalar bindings distinct from fragments and identifiers', async () => {
+  const sql = helper.pg({ ...helper.config, max: 1 })
+  try {
+    const project = (value) => sql`SELECT (${value})::int AS value FROM (SELECT 13::int AS n) source`
+
+    assert.deepStrictEqual(await project(7), [{ value: 7 }])
+    assert.deepStrictEqual(await project(sql`${2}::int + ${3}::int`), [{ value: 5 }])
+    assert.deepStrictEqual(await project(sql.identifier('n')), [{ value: 13 }])
+    assert.deepStrictEqual(await project(11), [{ value: 11 }])
+  } finally {
+    await sql.end()
+  }
+})
+
+suite.test('mutable template strings are snapshotted per query without caching stale SQL', async () => {
+  const sql = helper.pg({ ...helper.config, max: 1 })
+  try {
+    const strings = ['SELECT (', ')::int AS value']
+    strings.raw = ['SELECT (', ')::int AS value']
+    const scalar = sql(strings, 7)
+    const fragment = sql(strings, sql`${2}::int + ${3}::int`)
+
+    strings[0] = 'SELECT (100 + '
+    strings[1] = ')::int AS changed'
+    strings.raw[0] = 'SELECT (100 + '
+    strings.raw[1] = ')::int AS changed'
+    const changed = sql(strings, 11)
+
+    assert.deepStrictEqual(await scalar, [{ value: 7 }])
+    assert.deepStrictEqual(await fragment, [{ value: 5 }])
+    assert.deepStrictEqual(await changed, [{ changed: 111 }])
+  } finally {
+    await sql.end()
+  }
+})
+
 suite.test('lazy writes execute once across execute, repeated await and promise assimilation', async () => {
   const sql = helper.pg({ ...helper.config, max: 1 })
   try {

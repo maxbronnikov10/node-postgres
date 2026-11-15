@@ -110,6 +110,92 @@ test('multiple dangerous column names handled safely', function () {
   assert.strictEqual(row.id, 1)
 })
 
+for (const rowMode of ['object', 'array']) {
+  test(`mixed text ${rowMode} rows preserve custom parsers, nulls and parser changes`, () => {
+    const fields = Object.freeze([
+      Object.freeze({ name: 'id', dataTypeID: 23, format: 'text' }),
+      Object.freeze({ name: 'label', dataTypeID: 25, format: 'text' }),
+      Object.freeze({ name: 'nullable', dataTypeID: 25, format: 'text' }),
+    ])
+    const result = new Result(rowMode, {
+      getTypeParser: (oid) => (value) => {
+        assert.notStrictEqual(value, null)
+        return oid === 23 ? Number(value) : `custom:${value}`
+      },
+    })
+    result.addFields(fields)
+    const input = Object.freeze(['42', 'hello', null])
+
+    assert.deepStrictEqual(
+      result.parseRow(input),
+      rowMode === 'array' ? [42, 'custom:hello', null] : { id: 42, label: 'custom:hello', nullable: null }
+    )
+    result._parsers[0] = (value) => `changed:${value}`
+
+    assert.deepStrictEqual(
+      result.parseRow(input),
+      rowMode === 'array'
+        ? ['changed:42', 'custom:hello', null]
+        : { id: 'changed:42', label: 'custom:hello', nullable: null }
+    )
+    const independent = new Result(rowMode)
+    independent.addFields(fields)
+    assert.deepStrictEqual(
+      independent.parseRow(input),
+      rowMode === 'array' ? [42, 'hello', null] : { id: 42, label: 'hello', nullable: null }
+    )
+    assert.throws(() => result.parseRow(['42']), /field count does not match/)
+    assert.throws(() => result.parseRow(['42', 'hello', null, 'extra']), /field count does not match/)
+  })
+
+  test(`text ${rowMode} rows safely parse hostile and duplicate names in column order`, () => {
+    const parsed = []
+    const result = new Result(rowMode, {
+      getTypeParser: () => (value) => {
+        parsed.push(value)
+        return JSON.parse(value)
+      },
+    })
+    result.addFields(
+      ['__proto__', 'x"];globalThis.textInjected=true;//', 'quote"\nline', 'duplicate', 'duplicate'].map((name) => ({
+        name,
+        dataTypeID: 114,
+        format: 'text',
+      }))
+    )
+
+    const row = result.parseRow(['{"admin":true}', '2', '3', '4', '5'])
+
+    assert.deepStrictEqual(
+      row,
+      rowMode === 'array'
+        ? [{ admin: true }, 2, 3, 4, 5]
+        : {
+            ['__proto__']: { admin: true },
+            ['x"];globalThis.textInjected=true;//']: 2,
+            ['quote"\nline']: 3,
+            duplicate: 5,
+          }
+    )
+    assert.deepStrictEqual(parsed, ['{"admin":true}', '2', '3', '4', '5'])
+    assert.strictEqual(Object.getPrototypeOf(row), rowMode === 'array' ? Array.prototype : Object.prototype)
+    assert.strictEqual(global.textInjected, undefined)
+  })
+
+  test(`a new binary or empty description clears the former text ${rowMode} reader`, () => {
+    const result = new Result(rowMode)
+    result.addFields([{ name: 'old', dataTypeID: 25, format: 'text' }])
+    assert.deepStrictEqual(result.parseRow(['text']), rowMode === 'array' ? ['text'] : { old: 'text' })
+
+    result.addFields([{ name: 'binary', dataTypeID: 23, format: 'binary' }])
+    const value = Buffer.from([0, 0, 0, 42])
+
+    assert.deepStrictEqual(result.parseRow([value]), rowMode === 'array' ? [42] : { binary: 42 })
+    result.addFields([])
+    assert.deepStrictEqual(result.parseRow([]), rowMode === 'array' ? [] : {})
+  })
+}
+
 function rawInt4({ value, rowMode = 'object', types }) {
   const result = new Result(rowMode, types)
   result.addFields([{ name: 'n', dataTypeID: 23, format: 'text' }])
@@ -132,12 +218,114 @@ function rawRow(values) {
   return { buffer: Buffer.concat([count, ...fields]), offset: 0, fieldCount: values.length }
 }
 
+for (const rowMode of ['object', 'array']) {
+  test(`mixed raw text ${rowMode} rows preserve UTF8, types, nulls and hostile duplicate keys`, () => {
+    const result = new Result(rowMode)
+    result.addFields([
+      { name: 'n', dataTypeID: 23, format: 'text' },
+      { name: 'label', dataTypeID: 25, format: 'text' },
+      { name: 'enabled', dataTypeID: 16, format: 'text' },
+      { name: '__proto__', dataTypeID: 3802, format: 'text' },
+      { name: 'big', dataTypeID: 20, format: 'text' },
+      { name: 'empty', dataTypeID: 25, format: 'text' },
+      { name: 'x"];globalThis.rawTextInjected=true;//\n"', dataTypeID: 25, format: 'text' },
+      { name: 'duplicate', dataTypeID: 25, format: 'text' },
+      { name: 'duplicate', dataTypeID: 23, format: 'text' },
+    ])
+
+    const row = result.parseRawRow(
+      Object.freeze(rawRow(['42', 'Привет😀', 't', '{"v":1}', '9007199254740993', null, 'safe', 'first', '7']))
+    )
+
+    assert.deepStrictEqual(
+      row,
+      rowMode === 'array'
+        ? [42, 'Привет😀', true, { v: 1 }, '9007199254740993', null, 'safe', 'first', 7]
+        : {
+            n: 42,
+            label: 'Привет😀',
+            enabled: true,
+            ['__proto__']: { v: 1 },
+            big: '9007199254740993',
+            empty: null,
+            ['x"];globalThis.rawTextInjected=true;//\n"']: 'safe',
+            duplicate: 7,
+          }
+    )
+    assert.strictEqual(Object.getPrototypeOf(row), rowMode === 'array' ? Array.prototype : Object.prototype)
+    assert.strictEqual(global.rawTextInjected, undefined)
+    assert.strictEqual(result.prefersRawInt4, false)
+    assert.strictEqual(result.supportsRawRows, true)
+    assert.throws(() => result.parseRawRow(rawRow(['42'])), /field count does not match/)
+  })
+
+  test(`a cached raw text ${rowMode} shape never bypasses a custom int4 parser`, () => {
+    const fields = [
+      { name: 'n', dataTypeID: 23, format: 'text' },
+      { name: 'label', dataTypeID: 25, format: 'text' },
+    ]
+    const builtin = new Result(rowMode)
+    builtin.addFields(fields)
+    const custom = new Result(rowMode, {
+      getTypeParser: (oid, format) =>
+        oid === 23 ? (value) => `custom:${typeof value}:${value}` : require('pg-types').getTypeParser(oid, format),
+    })
+    custom.addFields(fields)
+
+    assert.deepStrictEqual(
+      builtin.parseRawRow(rawRow(['42', 'original'])),
+      rowMode === 'array' ? [42, 'original'] : { n: 42, label: 'original' }
+    )
+    assert.deepStrictEqual(
+      custom.parseRawRow(rawRow(['42', 'custom'])),
+      rowMode === 'array' ? ['custom:string:42', 'custom'] : { n: 'custom:string:42', label: 'custom' }
+    )
+    custom._parsers[0] = (value) => `changed:${value}`
+    assert.deepStrictEqual(
+      custom.parseRawRow(rawRow(['7', 'changed'])),
+      rowMode === 'array' ? ['changed:7', 'changed'] : { n: 'changed:7', label: 'changed' }
+    )
+  })
+
+  test(`raw text ${rowMode} int8 values preserve precision, malformed strings and custom overrides`, () => {
+    const fields = [
+      { name: 'positive', dataTypeID: 20, format: 'text' },
+      { name: 'negative', dataTypeID: 20, format: 'text' },
+      { name: 'malformed', dataTypeID: 20, format: 'text' },
+    ]
+    const builtin = new Result(rowMode)
+    builtin.addFields(fields)
+    const custom = new Result(rowMode, { getTypeParser: () => (value) => `custom:${value}` })
+    custom.addFields(fields)
+    const values = ['9007199254740993', '-9223372036854775808', '12 junk']
+
+    assert.deepStrictEqual(
+      builtin.parseRawRow(rawRow(values)),
+      rowMode === 'array'
+        ? ['9007199254740993', '-9223372036854775808', '12 junk']
+        : { positive: '9007199254740993', negative: '-9223372036854775808', malformed: '12 junk' }
+    )
+    assert.deepStrictEqual(
+      custom.parseRawRow(rawRow(values)),
+      rowMode === 'array'
+        ? ['custom:9007199254740993', 'custom:-9223372036854775808', 'custom:12 junk']
+        : {
+            positive: 'custom:9007199254740993',
+            negative: 'custom:-9223372036854775808',
+            malformed: 'custom:12 junk',
+          }
+    )
+  })
+}
+
 const canonicalInt4 = [
   { value: '-2147483648', expected: -2147483648, why: 'minimum signed int4' },
   { value: '2147483647', expected: 2147483647, why: 'maximum signed int4' },
   { value: '-1', expected: -1, why: 'a negative single digit' },
   { value: '0', expected: 0, why: 'zero' },
   { value: '1', expected: 1, why: 'a positive single digit' },
+  { value: '42', expected: 42, why: 'a positive two-digit value' },
+  { value: '999', expected: 999, why: 'a positive three-digit value' },
   { value: '-123456789', expected: -123456789, why: 'a negative multi-digit value' },
   { value: '123456789', expected: 123456789, why: 'a positive multi-digit value' },
 ]
@@ -216,17 +404,27 @@ test('binary int4, text int8, numeric, null and __proto__ retain their raw row b
   assert.strictEqual(row.nullable, null)
 })
 
-test('an int4 parser overridden before loading pg is never bypassed', () => {
+test('int4 and int8 parsers overridden before loading pg are never bypassed', () => {
   const { execFileSync } = require('node:child_process')
   const script = `
     const assert = require('node:assert/strict')
     const types = require('pg-types')
+    const integerParser = types.getTypeParser(23, 'text')
     types.setTypeParser(23, value => 'before:' + value)
+    types.setTypeParser(20, value => 'before-int8:' + value)
     const Result = require('./packages/pg/lib/result')
     const result = new Result()
     result.addFields([{ name: 'n', dataTypeID: 23, format: 'text' }])
     const buffer = Buffer.from([0, 1, 0, 0, 0, 2, 52, 50])
     assert.deepEqual(result.parseRawRow({ buffer, offset: 0, fieldCount: 1 }), { n: 'before:42' })
+    const big = new Result()
+    big.addFields([{ name: 'n', dataTypeID: 20, format: 'text' }])
+    assert.deepEqual(big.parseRawRow({ buffer, offset: 0, fieldCount: 1 }), { n: 'before-int8:42' })
+    types.setTypeParser(23, integerParser)
+    require('./packages/pg/lib').defaults.parseInt8 = true
+    const numeric = new Result()
+    numeric.addFields([{ name: 'n', dataTypeID: 20, format: 'text' }])
+    assert.deepEqual(numeric.parseRawRow({ buffer, offset: 0, fieldCount: 1 }), { n: 42 })
   `
 
   execFileSync(process.execPath, ['-e', script], { cwd: require('node:path').resolve(__dirname, '../../../..') })
@@ -265,6 +463,27 @@ function int4Result({ names, rowMode = 'object' }) {
   result.addFields(names.map((name) => ({ name, dataTypeID: 23, format: 'text' })))
   return result
 }
+
+test('mixed int4 widths preserve null offsets and validate every short ASCII digit', () => {
+  const names = ['one', 'two', 'three', 'empty', 'negative', 'negativeZero', 'junk', 'next', 'invalid', 'last']
+  const values = ['7', '42', '999', null, '-12', '-0', '1x', '83', '12x', '6']
+  const object = int4Result({ names })
+  const array = int4Result({ names, rowMode: 'array' })
+
+  assert.deepStrictEqual(object.parseRawRow(rawRow(values)), {
+    one: 7,
+    two: 42,
+    three: 999,
+    empty: null,
+    negative: -12,
+    negativeZero: -0,
+    junk: 1,
+    next: 83,
+    invalid: 12,
+    last: 6,
+  })
+  assert.deepStrictEqual(array.parseRawRow(rawRow(values)), [7, 42, 999, null, -12, -0, 1, 83, 12, 6])
+})
 
 test('specialized object rows treat executable-looking column names as ordinary keys', () => {
   const result = int4Result({
@@ -327,6 +546,21 @@ test('disabling string code generation keeps object and array row parsing availa
   const script = `
     const assert = require('node:assert/strict')
     const Result = require('./packages/pg/lib/result')
+    const mixedObject = new Result()
+    mixedObject.addFields([
+      { name: '__proto__', dataTypeID: 25, format: 'text' },
+      { name: 'n', dataTypeID: 23, format: 'text' },
+      { name: 'nullable', dataTypeID: 25, format: 'text' }
+    ])
+    assert.deepEqual(mixedObject.parseRow(['text', '42', null]), { ['__proto__']: 'text', n: 42, nullable: null })
+    const mixedBuffer = Buffer.from([0, 3, 0, 0, 0, 4, 116, 101, 120, 116, 0, 0, 0, 2, 52, 50, 255, 255, 255, 255])
+    assert.deepEqual(mixedObject.parseRawRow({ buffer: mixedBuffer, offset: 0, fieldCount: 3 }), { ['__proto__']: 'text', n: 42, nullable: null })
+    const mixedArray = new Result('array', { getTypeParser: () => value => 'custom:' + value })
+    mixedArray.addFields([
+      { name: 'value', dataTypeID: 25, format: 'text' },
+      { name: 'nullable', dataTypeID: 25, format: 'text' }
+    ])
+    assert.deepEqual(mixedArray.parseRow(['text', null]), ['custom:text', null])
     const object = new Result()
     object.addFields([{ name: '__proto__', dataTypeID: 23, format: 'text' }])
     const array = new Result('array')
@@ -350,6 +584,7 @@ test('unexpected compiler failures are reported instead of silently selecting an
     globalThis.Function = function () { throw failure }
     const result = new Result()
     assert.throws(() => result.addFields([{ name: 'n', dataTypeID: 23, format: 'text' }]), error => error === failure)
+    assert.throws(() => result.addFields([{ name: 'n', dataTypeID: 25, format: 'text' }]), error => error === failure)
   `
 
   execFileSync(process.execPath, ['-e', script], { cwd: require('node:path').resolve(__dirname, '../../../..') })

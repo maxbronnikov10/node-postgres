@@ -50,7 +50,7 @@ export function parseRaw({
         inCallback = false
       })
     } catch (error) {
-      if (inCallback || !(error instanceof ProtocolError)) throw error
+      if (inCallback || parser.consumingDataRow || !(error instanceof ProtocolError)) throw error
       fail(error)
     }
   }

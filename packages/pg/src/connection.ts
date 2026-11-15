@@ -11,6 +11,7 @@ const { getStream } = stream
 
 const flushBuffer = serialize.flush()
 const syncBuffer = serialize.sync()
+const executeSyncBuffer = Buffer.concat([serialize.execute({ portal: '', rows: 0 }), syncBuffer])
 const endBuffer = serialize.end()
 
 // TODO(bmc) support binary mode at some point
@@ -48,9 +49,13 @@ class Connection extends EventEmitter {
     this._emitMessage = false
     const self = this
     this.on('newListener', function (eventName) {
+      if (eventName === 'message' || eventName === 'dataRow') self.setDataRowConsumer(undefined)
       if (eventName === 'message') {
         self._emitMessage = true
       }
+    })
+    this.on('removeListener', function (eventName) {
+      if (eventName === 'message' || eventName === 'dataRow') self.setDataRowConsumer(undefined)
     })
   }
 
@@ -78,6 +83,7 @@ class Connection extends EventEmitter {
     this.stream.on('error', reportStreamError)
 
     this.stream.on('close', function () {
+      self.setDataRowConsumer(undefined)
       self.emit('end')
     })
 
@@ -169,6 +175,11 @@ class Connection extends EventEmitter {
     if (this._parser) this._parser.setDataRowMode(mode)
   }
 
+  /** @internal */
+  setDataRowConsumer(consumer: Parameters<Parser['setDataRowConsumer']>[0]) {
+    this._parser?.setDataRowConsumer(consumer)
+  }
+
   requestSsl() {
     this.stream.write(serialize.requestSsl())
   }
@@ -214,6 +225,17 @@ class Connection extends EventEmitter {
     this._send(serialize.bind(config))
   }
 
+  /** @internal Cached text queries on the default portal keep their own Sync barrier. */
+  bindExecute(config: Parameters<typeof serialize.bind>[0]) {
+    const bindBuffer = serialize.bind(config)
+    if (bindBuffer.length <= 4096) {
+      this._send(Buffer.concat([bindBuffer, executeSyncBuffer]))
+    } else {
+      this._send(bindBuffer)
+      this._send(executeSyncBuffer)
+    }
+  }
+
   // send execute message
   execute(config: Parameters<typeof serialize.execute>[0]) {
     this._send(serialize.execute(config))
@@ -240,6 +262,7 @@ class Connection extends EventEmitter {
   }
 
   end() {
+    this.setDataRowConsumer(undefined)
     // 0x58 = 'X'
     this._ending = true
     if (!this._connecting || !this.stream.writable) {

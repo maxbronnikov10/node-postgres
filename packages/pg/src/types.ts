@@ -132,7 +132,7 @@ export interface QueryConfig {
   callback?: QueryCallback
   pipeline?: boolean
   autoBatch?: boolean
-  [resultBudget]?: (query: BufferedQuery) => (message: BackendMessage) => boolean
+  [resultBudget]?: (query: BufferedQuery) => (message: Pick<BackendMessage, 'name' | 'length'>) => boolean
 }
 
 export interface QueryArrayConfig extends QueryConfig {

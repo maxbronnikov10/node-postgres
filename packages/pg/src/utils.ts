@@ -1,6 +1,7 @@
 'use strict'
 
 import defaults = require('./defaults')
+import resultBudget = require('./query-result-budget')
 import type { QueryConfig, QueryCallback, PgError } from './types'
 import nodeUtils = require('node:util')
 
@@ -188,6 +189,11 @@ function isOrdinaryQueryConfig(config: unknown) {
     Object.getPrototypeOf(config) !== Object.prototype
   ) {
     return false
+  }
+
+  // Executor owns and validates configs carrying this private hook before dispatch.
+  if (typeof Object.getOwnPropertyDescriptor(config, resultBudget)?.value === 'function') {
+    return true
   }
 
   for (const key of Reflect.ownKeys(config)) {

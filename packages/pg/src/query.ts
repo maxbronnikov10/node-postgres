@@ -7,7 +7,13 @@ import utils = require('./utils')
 import resultBudget = require('./query-result-budget')
 
 import type { Domain } from 'domain'
-import type { BackendMessage, Field, RawDataRowMessage, RowDescriptionMessage } from 'pg-protocol/dist/messages'
+import type {
+  BackendMessage,
+  BorrowedDataRow,
+  Field,
+  RawDataRowMessage,
+  RowDescriptionMessage,
+} from 'pg-protocol/dist/messages'
 import type Connection = require('./connection')
 import type {
   CustomTypesConfig,
@@ -24,6 +30,7 @@ type QueryProcess = NodeJS.Process & { readonly domain?: Domain | null }
 type RowDescription = BackendMessage & { readonly fields: Field[] }
 type DataRow =
   | RawDataRowMessage
+  | BorrowedDataRow
   | (BackendMessage & { readonly buffer?: undefined; readonly fields: (string | Buffer | null)[] })
 type CommandComplete = BackendMessage & { readonly text: string }
 
@@ -44,7 +51,8 @@ class Query<R extends object = QueryResultRow> extends EventEmitter {
   _accumulateRows: QueryCallback<R> | boolean | undefined
   _autoBatch?: boolean
   _cachedRowDescription?: RowDescriptionMessage
-  private _resultBudget: ((message: BackendMessage) => boolean) | undefined
+  _cachedRowLayouts?: { object?: ReturnType<Result['_getRowLayout']>; array?: ReturnType<Result['_getRowLayout']> }
+  private _resultBudget: ((message: Pick<BackendMessage, 'name' | 'length'>) => boolean) | undefined
 
   constructor(
     config?: string | ConstructorConfig<R>,
@@ -125,7 +133,13 @@ class Query<R extends object = QueryResultRow> extends EventEmitter {
   handleRowDescription(msg: RowDescription) {
     if (this._resultBudget && !this._resultBudget(msg)) return
     this._checkForMultirow()
-    this._result!.addFields(msg.fields)
+    const result = this._result!
+    const mode = result.rowAsArray ? 'array' : 'object'
+    const layout = this._cachedRowLayouts?.[mode]
+    if (!layout || !result._useRowLayout({ fields: msg.fields, layout })) {
+      result.addFields(msg.fields)
+      if (this._cachedRowLayouts) this._cachedRowLayouts[mode] = result._getRowLayout()
+    }
     this._accumulateRows = this.callback || !this.listeners('row').length
   }
 
@@ -145,10 +159,15 @@ class Query<R extends object = QueryResultRow> extends EventEmitter {
     }
 
     if (this._canceledDueToError) return
-    this.emit('row', row, this._result)
+    if (!this._resultBudget || this.listenerCount('row') > 0) this.emit('row', row, this._result)
     if (this._accumulateRows) {
       this._result!.addRow(row)
     }
+  }
+
+  /** @internal Only executor-owned queries can accept borrowed protocol frames. */
+  get _canConsumeDataRows(): boolean {
+    return !!this._resultBudget && !this.types && !!this._result?.supportsRawRows && !this._canceledDueToError
   }
 
   _discardResult(error?: PgError) {
@@ -286,8 +305,16 @@ class Query<R extends object = QueryResultRow> extends EventEmitter {
     // because we're mapping user supplied values to
     // postgres wire protocol compatible values it could
     // throw an exception, so try/catch this section
+    const cachedDescription = !this.binary && this.hasBeenParsed(connection) ? this._cachedRowDescription : undefined
+    const bindExecute =
+      cachedDescription &&
+      this.name &&
+      connection.parsedStatements[this.name] !== undefined &&
+      !this.portal &&
+      !this.rows &&
+      typeof connection.bindExecute === 'function'
     try {
-      connection.bind({
+      connection[bindExecute ? 'bindExecute' : 'bind']({
         portal: this.portal,
         statement: this.name,
         values: this.values as unknown[] | undefined,
@@ -305,8 +332,8 @@ class Query<R extends object = QueryResultRow> extends EventEmitter {
       return
     }
 
-    if (this._cachedRowDescription && !this.binary && this.hasBeenParsed(connection)) {
-      this.handleRowDescription(this._cachedRowDescription)
+    if (cachedDescription) {
+      this.handleRowDescription(cachedDescription)
     } else {
       connection.describe({
         type: 'P',
@@ -314,7 +341,7 @@ class Query<R extends object = QueryResultRow> extends EventEmitter {
       })
     }
 
-    this._getRows(connection, this.rows)
+    if (!bindExecute) this._getRows(connection, this.rows)
   }
 
   handleCopyInResponse(connection: Connection) {

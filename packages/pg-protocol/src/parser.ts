@@ -19,6 +19,7 @@ import {
   Field,
   DataRowMessage,
   RawDataRowMessage,
+  BorrowedDataRow,
   ProtocolError,
   ParameterStatusMessage,
   BackendKeyDataMessage,
@@ -80,6 +81,11 @@ const enum MessageCodes {
 
 export type MessageCallback = (msg: BackendMessage) => void
 
+/** @internal Must consume borrowed frame synchronously, without retaining it or its buffer. */
+export interface DataRowConsumer {
+  handleDataRow(message: BorrowedDataRow): void
+}
+
 export class Parser {
   private buffer: Buffer = emptyBuffer
   private bufferLength: number = 0
@@ -88,6 +94,16 @@ export class Parser {
   private mode: Mode | 'raw'
   private bufferShared = false
   private maxMessageSize: number
+  private dataRowConsumer: DataRowConsumer | undefined
+  private readonly dataRowFrame: BorrowedDataRow = {
+    name: 'dataRow',
+    length: 0,
+    buffer: emptyBuffer,
+    offset: 0,
+    fieldCount: 0,
+  }
+  /** @internal Distinguishes application exceptions from malformed protocol frames. */
+  public consumingDataRow = false
 
   constructor(opts?: StreamOptions) {
     if (opts?.mode === 'binary') {
@@ -108,6 +124,11 @@ export class Parser {
     this.mode = mode
   }
 
+  /** @internal */
+  public setDataRowConsumer(consumer: DataRowConsumer | undefined): void {
+    this.dataRowConsumer = consumer
+  }
+
   public end(): void {
     if (this.bufferLength > 0) throw new ProtocolError('Unexpected EOF in protocol message')
   }
@@ -118,6 +139,7 @@ export class Parser {
   }
 
   public parse(buffer: Buffer, callback: MessageCallback) {
+    this.consumingDataRow = false
     if (
       this.bufferLength > 0 &&
       this.bufferLength < HEADER_LENGTH &&
@@ -141,7 +163,7 @@ export class Parser {
       const fullMessageLength = CODE_LENGTH + length
       if (fullMessageLength + offset <= bufferFullLength) {
         const message = this.handlePacket(offset + HEADER_LENGTH, code, length, this.buffer)
-        callback(message)
+        if (message !== undefined) callback(message)
         offset += fullMessageLength
       } else {
         break
@@ -195,7 +217,7 @@ export class Parser {
     }
   }
 
-  private handlePacket(offset: number, code: number, length: number, bytes: Buffer): BackendMessage {
+  private handlePacket(offset: number, code: number, length: number, bytes: Buffer): BackendMessage | undefined {
     const { reader } = this
 
     // NOTE: This undesirably retains the buffer in `this.reader` if the `parse*Message` calls below throw. However, those should only throw in the case of a protocol error, which normally results in the reader being discarded.
@@ -229,6 +251,22 @@ export class Parser {
         message = emptyQuery
         break
       case MessageCodes.DataRow:
+        if (this.dataRowConsumer) {
+          const frame = this.dataRowFrame
+          frame.fieldCount = RawDataRowMessage.validate(reader, length)
+          frame.length = length
+          frame.buffer = bytes
+          frame.offset = offset
+          this.consumingDataRow = true
+          try {
+            this.dataRowConsumer.handleDataRow(frame)
+            this.consumingDataRow = false
+          } finally {
+            frame.buffer = emptyBuffer
+            reader.setBuffer(0, emptyBuffer)
+          }
+          return undefined
+        }
         if (this.mode === 'raw') {
           message = new RawDataRowMessage(length, reader)
           this.bufferShared = true
@@ -353,6 +391,9 @@ const parseParameterDescriptionMessage = (reader: BufferReader) => {
   return message
 }
 
+type Utf8Buffer = Buffer & { utf8Slice(start: number, end: number): string }
+const nativeUtf8Slice = typeof (Buffer.prototype as Partial<Utf8Buffer>).utf8Slice === 'function'
+
 const parseDataRowMessage = (reader: BufferReader, length: number) => {
   const buffer = reader.getBuffer()
   let offset = reader.getOffset()
@@ -369,7 +410,12 @@ const parseDataRowMessage = (reader: BufferReader, length: number) => {
     if (length < -1 || (length >= 0 && length > end - offset)) {
       throw new ProtocolError('DataRow field length is outside its payload')
     }
-    fields[i] = length === -1 ? null : buffer.toString('utf8', offset, offset + length)
+    fields[i] =
+      length === -1
+        ? null
+        : nativeUtf8Slice
+        ? (buffer as Utf8Buffer).utf8Slice(offset, offset + length)
+        : buffer.toString('utf8', offset, offset + length)
     if (length !== -1) offset += length
   }
   if (offset !== end) throw new ProtocolError('DataRow contains trailing bytes')

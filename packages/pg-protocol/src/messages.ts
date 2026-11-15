@@ -233,6 +233,15 @@ export class ProtocolError extends Error {
   public readonly code = 'PG_PROTOCOL_ERROR'
 }
 
+/** @internal Borrowed only for the duration of DataRowConsumer.handleDataRow; never retain this frame or its buffer. */
+export interface BorrowedDataRow {
+  readonly name: 'dataRow'
+  length: number
+  buffer: Buffer
+  offset: number
+  fieldCount: number
+}
+
 export class RawDataRowMessage {
   public readonly name = 'dataRow'
   public readonly fieldCount: number
@@ -243,13 +252,20 @@ export class RawDataRowMessage {
     public length: number,
     reader: BufferReader
   ) {
-    const buffer = (this.buffer = reader.getBuffer())
+    this.buffer = reader.getBuffer()
     this.offset = reader.getOffset()
-    const end = this.offset + length - 4
-    if (this.offset + 2 > end) throw new ProtocolError('DataRow is missing its field count')
-    this.fieldCount = buffer.readUInt16BE(this.offset)
-    let offset = this.offset + 2
-    for (let i = 0; i < this.fieldCount; i++) {
+    this.fieldCount = RawDataRowMessage.validate(reader, length)
+  }
+
+  /** @internal Validate before exposing either owned messages or borrowed frames. */
+  static validate(reader: BufferReader, length: number): number {
+    const buffer = reader.getBuffer()
+    let offset = reader.getOffset()
+    const end = offset + length - 4
+    if (offset + 2 > end) throw new ProtocolError('DataRow is missing its field count')
+    const fieldCount = buffer.readUInt16BE(offset)
+    offset += 2
+    for (let i = 0; i < fieldCount; i++) {
       if (offset + 4 > end) throw new ProtocolError('DataRow is missing a field length')
       const length = buffer.readInt32BE(offset)
       offset += 4
@@ -259,6 +275,7 @@ export class RawDataRowMessage {
       if (length !== -1) offset += length
     }
     if (offset !== end) throw new ProtocolError('DataRow contains trailing bytes')
+    return fieldCount
   }
 
   get raw(): Buffer {

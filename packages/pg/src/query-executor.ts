@@ -68,7 +68,6 @@ interface Task extends PreparedQuery {
   resultError?: QueryExecutorError
   resultQuery?: BufferedQuery
   abortListener?: Disposable
-  timer?: NodeJS.Timeout
 }
 interface AbortListenerCapability {
   addAbortListener(signal: AbortSignal, listener: () => void): Disposable
@@ -104,6 +103,9 @@ class QueryExecutor {
   private _generation: number
   private readonly _records: Set<ConnectionRecord>
   private readonly _pending: Map<Task, Task>
+  private readonly _timed: Set<Task>
+  private _deadlineTimer?: NodeJS.Timeout
+  private _deadlineAt: number
   private _inFlight: number
   private _resultRows: number
   private _resultBytes: number
@@ -182,6 +184,8 @@ class QueryExecutor {
     delete this._options.targetSessionAttrs
     this._records = new Set()
     this._pending = new Map()
+    this._timed = new Set()
+    this._deadlineAt = 0
     this._inFlight = 0
     this._resultRows = 0
     this._resultBytes = 0
@@ -409,7 +413,9 @@ class QueryExecutor {
     reservedRecord?: ConnectionRecord
   }) {
     const task: Task = {
-      ...prepared,
+      config: prepared.config,
+      timeout: prepared.timeout,
+      signal: prepared.signal,
       transaction: reservedRecord ? true : undefined,
       resolve,
       lease,
@@ -417,6 +423,9 @@ class QueryExecutor {
       state: 'queued',
       resultRows: 0,
       resultBytes: 0,
+      record: undefined,
+      resultQuery: undefined,
+      resultError: undefined,
       deadline: prepared.timeout ? performance.now() + prepared.timeout : 0,
     }
     try {
@@ -443,7 +452,10 @@ class QueryExecutor {
       })
       return
     }
-    if (task.deadline) task.timer = setTimeout(() => this._expire(task), task.timeout)
+    if (task.deadline) {
+      this._timed.add(task)
+      this._scheduleDeadline(task.deadline)
+    }
     if (reservedRecord) {
       this._dispatch({ task, record: reservedRecord })
       return
@@ -496,13 +508,47 @@ class QueryExecutor {
       this._pending.delete(task)
     }
     task.state = 'done'
-    clearTimeout(task.timer)
+    this._forgetDeadline(task)
     task.abortListener?.[Symbol.dispose]()
     if (error) task.reject(error)
     else task.resolve(result!)
   }
 
-  private _consumeResult({ task, query }: { task: Task; query: BufferedQuery }, message: BackendMessage): boolean {
+  private _scheduleDeadline(deadline: number) {
+    if (this._deadlineTimer && this._deadlineAt <= deadline) {
+      this._deadlineTimer.ref()
+      return
+    }
+    clearTimeout(this._deadlineTimer)
+    this._deadlineAt = deadline
+    this._deadlineTimer = setTimeout(
+      () => this._expireDeadlines(),
+      Math.max(1, Math.ceil(deadline - performance.now()))
+    )
+  }
+
+  private _forgetDeadline(task: Task) {
+    this._timed.delete(task)
+    if (!this._timed.size) this._deadlineTimer?.unref()
+  }
+
+  private _expireDeadlines() {
+    this._deadlineTimer = undefined
+    this._deadlineAt = 0
+    const now = performance.now()
+    for (const task of this._timed) {
+      if (task.deadline <= now) this._expire(task)
+    }
+    let earliest = Infinity
+    for (const task of this._timed) earliest = Math.min(earliest, task.deadline)
+    // Expiry can dispatch work synchronously and arm an earlier timer.
+    if (earliest !== Infinity) this._scheduleDeadline(earliest)
+  }
+
+  private _consumeResult(
+    { task, query }: { task: Task; query: BufferedQuery },
+    message: Pick<BackendMessage, 'name' | 'length'>
+  ): boolean {
     if (task.state !== 'assigned' || (task.record!.state !== 'ready' && task.record!.state !== 'reserved')) {
       query._discardResult(task.resultError)
       return false
@@ -563,14 +609,20 @@ class QueryExecutor {
     record.tasks.add(task)
     this._inFlight++
     if (task.lease) {
-      clearTimeout(task.timer)
+      this._forgetDeadline(task)
       record.state = 'reserved'
       task.lease(task)
       return
     }
     try {
       record.client.query({
-        ...task.config,
+        text: task.config.text,
+        values: task.config.values,
+        name: task.config.name,
+        binary: task.config.binary,
+        rowMode: task.config.rowMode,
+        types: task.config.types,
+        queryMode: 'extended',
         query_timeout: 0,
         [resultBudget]: (query) => {
           task.resultQuery = query
@@ -606,8 +658,10 @@ class QueryExecutor {
             candidate.state === 'ready' &&
             (task.lease ? candidate.tasks.size === 0 : candidate.tasks.size < this._perConnection) &&
             (!record || candidate.tasks.size < record.tasks.size)
-          )
+          ) {
             record = candidate
+            if (!candidate.tasks.size) break
+          }
         }
         if (!record) break
         if (task.deadline && task.deadline <= performance.now()) {
@@ -616,35 +670,37 @@ class QueryExecutor {
         }
         this._dispatch({ task, record })
       }
-      let projected = 0
-      for (const record of this._records) {
-        if (record.state === 'connecting') projected += this._perConnection
-      }
-      while (this._pending.size > projected && this._records.size < this._max) {
-        const endpoint = this._pickEndpoint()
-        if (!endpoint) break
-        if (this._open(endpoint)) projected += this._perConnection
-      }
-      let healthy = false
-      for (const record of this._records) {
-        if (record.state !== 'closing') healthy = true
-      }
-      if (this._pending.size && !healthy) {
-        const retryAt = Math.min(...this._endpoints.map((endpoint) => endpoint.retryAt))
-        if (
-          performance.now() < retryAt ||
-          this._endpoints.every((endpoint) => endpoint.failedGeneration === this._generation)
-        ) {
-          for (const task of this._pending.values())
-            this._settle({
-              task,
-              error: this._error({
-                code: 'PG_EXECUTOR_UNAVAILABLE',
-                message: 'No query connection available',
-                cause: this._lastFailure,
-                retryAfterMillis: Math.max(0, retryAt - performance.now()),
-              }),
-            })
+      if (this._pending.size) {
+        let projected = 0
+        for (const record of this._records) {
+          if (record.state === 'connecting') projected += this._perConnection
+        }
+        while (this._pending.size > projected && this._records.size < this._max) {
+          const endpoint = this._pickEndpoint()
+          if (!endpoint) break
+          if (this._open(endpoint)) projected += this._perConnection
+        }
+        let healthy = false
+        for (const record of this._records) {
+          if (record.state !== 'closing') healthy = true
+        }
+        if (this._pending.size && !healthy) {
+          const retryAt = Math.min(...this._endpoints.map((endpoint) => endpoint.retryAt))
+          if (
+            performance.now() < retryAt ||
+            this._endpoints.every((endpoint) => endpoint.failedGeneration === this._generation)
+          ) {
+            for (const task of this._pending.values())
+              this._settle({
+                task,
+                error: this._error({
+                  code: 'PG_EXECUTOR_UNAVAILABLE',
+                  message: 'No query connection available',
+                  cause: this._lastFailure,
+                  retryAfterMillis: Math.max(0, retryAt - performance.now()),
+                }),
+              })
+          }
         }
       }
       this._finish()
@@ -876,6 +932,9 @@ class QueryExecutor {
   destroy(cause?: unknown): Promise<void> {
     const result = this._shutdownPromise()
     this._state = 'destroyed'
+    clearTimeout(this._deadlineTimer)
+    this._deadlineTimer = undefined
+    this._deadlineAt = 0
     for (const task of this._pending.values())
       this._settle({
         task,
@@ -897,6 +956,9 @@ class QueryExecutor {
 
   private _finish() {
     if (this._state === 'open' || this._pending.size || this._inFlight) return
+    clearTimeout(this._deadlineTimer)
+    this._deadlineTimer = undefined
+    this._deadlineAt = 0
     for (const record of this._records) {
       if (record.state === 'closing') continue
       if (record.state === 'connecting') {

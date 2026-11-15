@@ -1,0 +1,112 @@
+name: Default SQL throughput
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [perf/sql-default-throughput]
+    paths:
+      - 'packages/pg/src/**'
+      - 'packages/pg-protocol/src/**'
+      - 'benchmark/*.js'
+      - '.github/workflows/benchmark-defaults.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    timeout-minutes: 35
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2, 3]
+        transport: [tcp, tls]
+    services:
+      postgres:
+        image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: nodepg_sql_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGDATABASE: nodepg_sql_test
+      PG_BENCH_POSTGRESJS_MODULE: ${{ github.workspace }}/competitor/node_modules/postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        if: matrix.transport == 'tcp'
+        with:
+          ref: 2db1b547902483602ded74f58c2477253bf30b4b
+          path: baseline
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.1
+          cache: yarn
+      - name: Build and pin competitor
+        run: |
+          echo "PGPORT=${{ job.services.postgres.ports[5432] }}" >> "$GITHUB_ENV"
+          yarn install --frozen-lockfile
+          yarn build
+          yarn tsc -p packages/pg/tsconfig.types.json
+          if [ '${{ matrix.transport }}' = tcp ]; then
+            (cd baseline && yarn install --frozen-lockfile && yarn build)
+          fi
+          npm install --prefix competitor --ignore-scripts --no-audit --no-fund --save-exact postgres@4.1.1
+          mkdir results
+          cp competitor/package-lock.json results/competitor-lock.json
+          npm view postgres@4.1.1 version gitHead dist.integrity --json > results/competitor-registry.json
+          node benchmark/production-load-check.js
+      - name: Before and after with same-code controls
+        if: matrix.transport == 'tcp'
+        run: >-
+          node benchmark/compare.js --base baseline --head . --profile sql-compile
+          --scenario 'tagged point SELECT, concurrent x16'
+          --rounds 8 --duration 3 --warmup 2
+          --output results/before-after.md --json-output results/before-after.json
+      - name: Configure verified TLS 1.3
+        if: matrix.transport == 'tls'
+        env:
+          FIXTURE: ${{ job.services.postgres.id }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/default-tls"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=localhost \
+            -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' \
+            -keyout "$RUNNER_TEMP/default-tls/server.key" -out "$RUNNER_TEMP/default-tls/server.crt" 2>/dev/null
+          chmod 600 "$RUNNER_TEMP/default-tls/server.key"
+          docker exec "$FIXTURE" mkdir -p /tmp/default-tls
+          docker cp "$RUNNER_TEMP/default-tls/server.key" "$FIXTURE:/tmp/default-tls/server.key"
+          docker cp "$RUNNER_TEMP/default-tls/server.crt" "$FIXTURE:/tmp/default-tls/server.crt"
+          docker exec "$FIXTURE" chown postgres:postgres /tmp/default-tls/server.key /tmp/default-tls/server.crt
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c "ALTER SYSTEM SET ssl='on'"
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c "ALTER SYSTEM SET ssl_cert_file='/tmp/default-tls/server.crt'"
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c "ALTER SYSTEM SET ssl_key_file='/tmp/default-tls/server.key'"
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c 'SELECT pg_reload_conf()'
+          echo "PG_BENCH_TLS_CA=$RUNNER_TEMP/default-tls/server.crt" >> "$GITHUB_ENV"
+          echo 'PG_BENCH_DELAY_MS=3' >> "$GITHUB_ENV"
+      - name: Defaults versus Postgres.js with same-code controls
+        run: >-
+          node benchmark/compare.js --base . --head . --profile postgresjs
+          --rounds 8 --duration 3 --warmup 2
+          --output results/comparison.md --json-output results/comparison.json
+      - name: Durable mixed load with default automatic decoding
+        run: >-
+          node --expose-gc benchmark/production-load.js --driver tag
+          --seconds 600 --rate 1500 --output results/load.json > results/load.log
+      - name: Summary
+        if: always()
+        run: cat results/*.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: default-throughput-${{ matrix.trial }}-${{ matrix.transport }}
+          path: results/
+          retention-days: 1

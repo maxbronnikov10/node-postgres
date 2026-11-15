@@ -30,7 +30,6 @@ import type {
   BinaryParser,
   TypeFormat,
   Notification,
-  ValueParser,
 } from './types'
 import type {
   AuthenticationMD5Password,
@@ -49,6 +48,11 @@ type ConnectCallback = (error?: Error | null, client?: Client) => void
 type EndCallback = (error?: Error | null) => void
 type ClientQueryCallback<R extends object = QueryResultRow> = (error: PgError | null, result: QueryResult<R>) => void
 type BatchCallback<R extends object = QueryResultRow> = (error: PgError | null, results?: Result<R>[]) => void
+type CachedDescription = {
+  message: RowDescriptionMessage
+  expiresAt: number
+  layouts: NonNullable<Query['_cachedRowLayouts']>
+}
 
 const activeQueryDeprecationNotice = nodeUtils.deprecate(
   () => {},
@@ -105,6 +109,7 @@ class Client extends EventEmitter {
   _connectionError: boolean
   _queryable: boolean
   _activeQuery: ExecutableQuery | null | undefined
+  private _dataRowHandler: ((message: DataRowMessage | RawDataRowMessage) => void) | undefined
   _txStatus: 'I' | 'T' | 'E' | null
   enableChannelBinding: boolean
   scramMaxIterations: number
@@ -116,9 +121,7 @@ class Client extends EventEmitter {
   _maxAutoPrepare: number
   _autoPreparedStatements: Map<string, string> | undefined
   _autoPreparePrefix: string | undefined
-  private _autoPreparedDescriptions:
-    | Map<string, { message: RowDescriptionMessage; expiresAt: number; parser: ValueParser }>
-    | undefined
+  private _autoPreparedDescriptions: Map<string, CachedDescription> | undefined
   binary: boolean | undefined
   processID: number | null
   secretKey: number | null
@@ -234,6 +237,7 @@ class Client extends EventEmitter {
   }
 
   _errorAllQueries(err: PgError) {
+    this.connection.setDataRowConsumer?.(undefined)
     if (this._pipelineDrainListener) {
       this.connection.stream.removeListener('drain', this._pipelineDrainListener)
       this._pipelineDrainListener = null
@@ -370,7 +374,8 @@ class Client extends EventEmitter {
     con.on('readyForQuery', this._handleReadyForQuery.bind(this))
     con.on('notice', this._handleNotice.bind(this))
     con.on('rowDescription', this._handleRowDescription.bind(this))
-    con.on('dataRow', this._handleDataRow.bind(this))
+    this._dataRowHandler = this._handleDataRow.bind(this)
+    con.on('dataRow', this._dataRowHandler)
     con.on('portalSuspended', this._handlePortalSuspended.bind(this))
     con.on('emptyQuery', this._handleEmptyQuery.bind(this))
     con.on('commandComplete', this._handleCommandComplete.bind(this))
@@ -483,6 +488,7 @@ class Client extends EventEmitter {
   }
 
   _handleReadyForQuery(msg: ReadyForQueryMessage) {
+    this.connection.setDataRowConsumer?.(undefined)
     this.connection.setDataRowMode?.('raw')
     if (this._connecting) {
       this._connecting = false
@@ -527,6 +533,7 @@ class Client extends EventEmitter {
   // this means the socket is dead - do a hard abort of all queries and emit
   // the socket error on the client as well
   _handleErrorEvent(err: PgError) {
+    this.connection.setDataRowConsumer?.(undefined)
     if (this._connecting) {
       return this._handleErrorWhileConnecting(err)
     }
@@ -537,6 +544,7 @@ class Client extends EventEmitter {
 
   // handle error messages from the postgres backend
   _handleErrorMessage(msg: PgError) {
+    this.connection.setDataRowConsumer?.(undefined)
     if (this._connecting) {
       return this._handleErrorWhileConnecting(msg)
     }
@@ -566,8 +574,10 @@ class Client extends EventEmitter {
     const query = activeQuery as Query
     if (
       (query.constructor as Function) === Query &&
-      query._result?.prefersRawInt4 &&
+      query._result &&
+      msg.fields.length > 0 &&
       msg.fields.length <= 32 &&
+      msg.fields.every((field) => field.format === 'text') &&
       query.text &&
       query.name &&
       !query.types &&
@@ -578,16 +588,37 @@ class Client extends EventEmitter {
       if (!descriptions.has(query.name) && descriptions.size >= this._maxAutoPrepare) {
         descriptions.delete(descriptions.keys().next().value!)
       }
+      const layouts: CachedDescription['layouts'] = {}
+      layouts[query._result.rowAsArray ? 'array' : 'object'] = query._result._getRowLayout()
       descriptions.set(query.name, {
         message: this._copyRowDescription(msg),
         expiresAt: Date.now() + 300000,
-        parser: query._result._parsers![0],
+        layouts,
       })
     }
+    this._setResultMode(activeQuery)
+  }
+
+  private _setResultMode(query: ExecutableQuery) {
+    const result = query.constructor === Query ? (query as Query)._result : null
+    const connection = this.connection
+    connection.setDataRowConsumer?.(
+      connection.constructor === Connection &&
+        this._handleDataRow === Client.prototype._handleDataRow &&
+        result &&
+        (query as Query)._canConsumeDataRows &&
+        connection.listenerCount('message') === 0 &&
+        connection.listenerCount('dataRow') === 1 &&
+        connection.listeners('dataRow')[0] === this._dataRowHandler
+        ? (query as Query)
+        : undefined
+    )
     this.connection.setDataRowMode?.(
-      activeQuery.constructor === Query &&
-        !(activeQuery as Query)._result?.prefersRawInt4 &&
-        msg.fields.every((field: { readonly format: TypeFormat }) => field.format === 'text')
+      result &&
+        result.fields.length > 0 &&
+        !result.prefersRawInt4 &&
+        !(query as Query)._canConsumeDataRows &&
+        result.fields.every((field) => field.format === 'text')
         ? 'text'
         : 'raw'
     )
@@ -809,6 +840,8 @@ class Client extends EventEmitter {
             this.readyForQuery = true
             this._pulseQueryQueue()
           })
+        } else {
+          this._setResultMode(activeQuery)
         }
       } else if (this.hasExecuted) {
         this._activeQuery = null
@@ -867,6 +900,7 @@ class Client extends EventEmitter {
     if (this.readyForQuery && !this._activeQuery && this._sentQueryQueue.length > 0) {
       this._activeQuery = this._sentQueryQueue.shift()
       this.readyForQuery = false
+      this._setResultMode(this._activeQuery!)
     }
     if (!this._activeQuery && this._sentQueryQueue.length === 0 && this._queryQueue.length === 0 && this.hasExecuted) {
       this.emit('drain')
@@ -968,8 +1002,9 @@ class Client extends EventEmitter {
         query.name = name
         if (name && !query.binary && !this.binary) {
           const cached = this._autoPreparedDescriptions!.get(name)
-          if (cached && cached.expiresAt > Date.now() && this._types.getTypeParser(23, 'text') === cached.parser) {
+          if (cached && cached.expiresAt > Date.now()) {
             ;(query as Query)._cachedRowDescription = this._copyRowDescription(cached.message)
+            ;(query as Query)._cachedRowLayouts = cached.layouts
           } else if (cached) {
             this._autoPreparedDescriptions!.delete(name)
           }

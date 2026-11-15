@@ -29,9 +29,30 @@ export interface Sql extends TransactionSql {
   end(): Promise<void>
 }
 
-type FragmentPart = string | { value: unknown } | SqlIdentifier
-type Part = FragmentPart | PendingQuery<object>
+type SqlFragment =
+  | { kind: 'tag'; strings: readonly string[]; values: readonly unknown[]; scalarText?: string }
+  | { kind: 'unsafe'; text: string; values: readonly unknown[] }
 type RunQuery = (config: IndependentQueryConfig) => Promise<QueryResult>
+
+class SqlTextCache {
+  private readonly entries = new Map<readonly string[], { text: string; expiresAt: number }>()
+
+  get(strings: readonly string[]): string {
+    const now = Date.now()
+    const cached = this.entries.get(strings)
+    if (cached && cached.expiresAt > now) return cached.text
+    if (cached) this.entries.delete(strings)
+    let text = strings[0]
+    for (let i = 1; i < strings.length; i++) text += '$' + i + strings[i]
+    if (Object.isFrozen(strings) && text.length <= 16384) {
+      if (this.entries.size >= 256) this.entries.delete(this.entries.keys().next().value!)
+      this.entries.set(strings, { text, expiresAt: now + 300000 })
+    }
+    return text
+  }
+}
+
+const sqlTexts = new SqlTextCache()
 
 export class SqlIdentifier {
   private readonly text: string
@@ -54,31 +75,35 @@ export class PendingQuery<R extends object = QueryResultRow> implements PromiseL
 
   constructor(
     private readonly scope: SqlScope,
-    private readonly fragment: { parts: readonly Part[]; unsafeValues?: readonly unknown[] }
+    private readonly fragment: SqlFragment
   ) {}
 
-  private compile(offset = 0): { text: string; values: unknown[] } {
+  private compile(offset = 0): { text: string; values: readonly unknown[] } {
     this.scope.assertOpen()
-    if (this.fragment.unsafeValues !== undefined) {
-      return { text: this.fragment.parts[0] as string, values: this.fragment.unsafeValues.slice() }
+    const fragment = this.fragment
+    if (fragment.kind === 'unsafe') return { text: fragment.text, values: fragment.values }
+    if (offset === 0 && fragment.scalarText !== undefined) {
+      return { text: fragment.scalarText, values: fragment.values }
     }
     const values: unknown[] = []
-    let text = ''
-    for (const part of this.fragment.parts) {
-      if (typeof part === 'string') {
-        text += part
-      } else if (part instanceof SqlIdentifier) {
+    let text = fragment.strings[0]
+    for (let i = 0; i < fragment.values.length; i++) {
+      const part = fragment.values[i]
+      if (part instanceof SqlIdentifier) {
         text += part.toString()
       } else if (part instanceof PendingQuery) {
         part.scope.assertOpen()
-        if (part.fragment.unsafeValues?.length) throw new TypeError('Parameterized unsafe queries cannot be nested')
+        if (part.fragment.kind === 'unsafe' && part.fragment.values.length) {
+          throw new TypeError('Parameterized unsafe queries cannot be nested')
+        }
         const nested = part.compile(offset + values.length)
         text += nested.text
         for (const value of nested.values) values.push(value)
       } else {
-        values.push(part.value)
+        values.push(part)
         text += '$' + (offset + values.length)
       }
+      text += fragment.strings[i + 1]
     }
     return { text, values }
   }
@@ -88,11 +113,11 @@ export class PendingQuery<R extends object = QueryResultRow> implements PromiseL
       this.promise = (async () => {
         const { text, values } = this.compile()
         const result = await this.scope.run({ text, values, rowMode: this.rowMode, queryMode: 'extended' })
-        return Object.defineProperties(result.rows, {
-          count: { value: result.rowCount },
-          command: { value: result.command },
-          columns: { value: result.fields },
-        }) as SqlRows<R>
+        const rows = result.rows as SqlRows<R>
+        Object.defineProperty(rows, 'count', { value: result.rowCount })
+        Object.defineProperty(rows, 'command', { value: result.command })
+        Object.defineProperty(rows, 'columns', { value: result.fields })
+        return rows
       })()
     }
     return this.promise
@@ -184,17 +209,23 @@ class SqlScope {
         if (values.length) throw new TypeError('Use a template literal or sql.unsafe for queries')
         return new SqlIdentifier(strings.split('.'))
       }
-      if (!Array.isArray(strings) || !Array.isArray(strings.raw) || strings.length !== values.length + 1) {
+      if (
+        !Array.isArray(strings) ||
+        !Array.isArray(strings.raw) ||
+        strings.length !== values.length + 1 ||
+        !strings.every((part) => typeof part === 'string')
+      ) {
         throw new TypeError('Expected a SQL template literal')
       }
-      const parts: Part[] = [strings[0]]
-      values.forEach((value, index) => {
-        parts.push(
-          value instanceof PendingQuery || value instanceof SqlIdentifier ? value : { value },
-          strings[index + 1]
-        )
+      const scalarText = values.some((value) => value instanceof PendingQuery || value instanceof SqlIdentifier)
+        ? undefined
+        : sqlTexts.get(strings)
+      return new PendingQuery<R>(this, {
+        kind: 'tag',
+        strings: Object.isFrozen(strings) ? strings : strings.slice(),
+        values,
+        scalarText,
       })
-      return new PendingQuery<R>(this, { parts })
     }
     return Object.assign(tag, {
       identifier: (...parts: string[]) => new SqlIdentifier(parts),
@@ -203,7 +234,7 @@ class SqlScope {
         if (typeof text !== 'string' || !text.trim() || (values !== undefined && !Array.isArray(values))) {
           throw new TypeError('Expected SQL text and an optional values array')
         }
-        return new PendingQuery<R>(this, { parts: [text], unsafeValues: values?.slice() })
+        return new PendingQuery<R>(this, { kind: 'unsafe', text, values: values?.slice() ?? [] })
       },
     }) as TransactionSql
   }
