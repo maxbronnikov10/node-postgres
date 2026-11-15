@@ -1,0 +1,139 @@
+name: Production-like SQL load
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [perf/sql-production-load]
+    paths:
+      - 'packages/pg/src/**'
+      - 'packages/pg/test/integration/client/sql-tag-tests.js'
+      - 'benchmark/*.js'
+      - '.github/workflows/benchmark-production.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2, 3]
+    services:
+      postgres:
+        image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: nodepg_sql_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGDATABASE: nodepg_sql_test
+      PG_BENCH_POSTGRESJS_MODULE: ${{ github.workspace }}/competitor/node_modules/postgres
+      TRIAL: ${{ matrix.trial }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: b067b66df2a37c2e1af54d49ca22e046c8c60760
+          path: baseline
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.1
+          cache: yarn
+      - name: Build both snapshots and pin competitor
+        run: |
+          echo "PGPORT=${{ job.services.postgres.ports[5432] }}" >> "$GITHUB_ENV"
+          yarn install --frozen-lockfile
+          yarn build
+          yarn tsc -p packages/pg/tsconfig.types.json
+          cd baseline
+          yarn install --frozen-lockfile
+          yarn build
+          cd ..
+          npm install --prefix competitor --ignore-scripts --no-audit --no-fund --save-exact postgres@4.1.1
+          mkdir results
+          cp competitor/package-lock.json results/competitor-lock.json
+          npm view postgres@4.1.1 version gitHead dist.integrity --json > results/competitor-registry.json
+          node benchmark/production-load-check.js
+      - name: SQL compiler before and after with noise controls
+        run: >-
+          node benchmark/compare.js --base baseline --head . --profile sql-compile
+          --scenario 'tagged point SELECT, concurrent x16'
+          --rounds 8 --duration 3 --warmup 2
+          --output results/compile.md --json-output results/compile.json
+      - name: Durable mixed TCP load through three APIs
+        run: |
+          case "$TRIAL" in
+            1) drivers='tag query postgresjs' ;;
+            2) drivers='query postgresjs tag' ;;
+            3) drivers='postgresjs tag query' ;;
+          esac
+          for driver in $drivers; do
+            node --expose-gc benchmark/production-load.js --driver "$driver" --seconds 120 --rate 1500 --output "results/tcp-$driver.json" > "results/tcp-$driver.log"
+          done
+      - name: Configure verified TLS 1.3
+        env:
+          FIXTURE: ${{ job.services.postgres.id }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/load-tls"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=localhost \
+            -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' \
+            -keyout "$RUNNER_TEMP/load-tls/server.key" -out "$RUNNER_TEMP/load-tls/server.crt" 2>/dev/null
+          cp "$RUNNER_TEMP/load-tls/server.crt" "$RUNNER_TEMP/load-tls/ca.crt"
+          chmod 600 "$RUNNER_TEMP/load-tls/"*
+          docker exec "$FIXTURE" mkdir -p /tmp/load-tls
+          docker cp "$RUNNER_TEMP/load-tls/server.key" "$FIXTURE:/tmp/load-tls/server.key"
+          docker cp "$RUNNER_TEMP/load-tls/server.crt" "$FIXTURE:/tmp/load-tls/server.crt"
+          docker exec "$FIXTURE" chown postgres:postgres /tmp/load-tls/server.key /tmp/load-tls/server.crt
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c "ALTER SYSTEM SET ssl='on'"
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c "ALTER SYSTEM SET ssl_cert_file='/tmp/load-tls/server.crt'"
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c "ALTER SYSTEM SET ssl_key_file='/tmp/load-tls/server.key'"
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c 'SELECT pg_reload_conf()'
+          echo "PG_BENCH_TLS_CA=$RUNNER_TEMP/load-tls/server.crt" >> "$GITHUB_ENV"
+          echo "PG_BENCH_ADMIN_PORT=$PGPORT" >> "$GITHUB_ENV"
+          echo 'PG_BENCH_ADMIN_DATABASE=nodepg_sql_test' >> "$GITHUB_ENV"
+      - name: Start verified transaction PgBouncer
+        run: |
+          python3 benchmark/unprepared/pooler.py --container nodepg-production-load \
+            --postgres-port "$PGPORT" --listen-port 6432 \
+            --tls-directory "$RUNNER_TEMP/load-tls" --output results/pooler.json
+          echo 'PGPORT=6432' >> "$GITHUB_ENV"
+          echo 'PGDATABASE=nodepg_tls' >> "$GITHUB_ENV"
+          echo 'PG_BENCH_PREPARE=0' >> "$GITHUB_ENV"
+          echo 'PG_BENCH_POOLER=1' >> "$GITHUB_ENV"
+          echo 'PG_BENCH_DELAY_MS=3' >> "$GITHUB_ENV"
+      - name: Verify live pooler settings
+        run: node benchmark/unprepared/check-pooler.js results/pooler-config.json
+      - name: TLS transaction-pooler load with delayed relay
+        run: |
+          case "$TRIAL" in
+            1) drivers='query postgresjs tag' ;;
+            2) drivers='postgresjs tag query' ;;
+            3) drivers='tag query postgresjs' ;;
+          esac
+          for driver in $drivers; do
+            duration=120
+            if [ "$driver" = tag ]; then duration=600; fi
+            node --expose-gc benchmark/production-load.js --driver "$driver" --seconds "$duration" --rate 1000 --output "results/pooler-$driver.json" > "results/pooler-$driver.log"
+          done
+      - name: Explicit Postgres.js parameter-type control
+        run: >-
+          node --expose-gc benchmark/production-load.js --driver postgresjs-typed
+          --seconds 120 --rate 1000 --output results/pooler-postgresjs-typed.json
+          > results/pooler-postgresjs-typed.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-like-load-${{ matrix.trial }}
+          path: results/
+          retention-days: 1

@@ -13,14 +13,18 @@ const ROWS = 500
 const createPostgresJsWorkload = async ({ pg, arm, profile = 'postgresjs' }) => {
   assert.ok(Number.isInteger(arm) && arm >= 0 && arm < 4)
   assert.ok(
-    ['postgresjs', 'postgresjs-unprepared', 'postgresjs-unprepared-infer', 'postgresjs-unprepared-typed'].includes(
-      profile
-    )
+    [
+      'postgresjs',
+      'postgresjs-unprepared',
+      'postgresjs-unprepared-infer',
+      'postgresjs-unprepared-typed',
+      'sql-compile',
+    ].includes(profile)
   )
-  const prepareStatements = profile === 'postgresjs'
+  const prepareStatements = profile === 'postgresjs' || profile === 'sql-compile'
   const infer = profile === 'postgresjs-unprepared-infer'
   const typedText = profile === 'postgresjs-unprepared-typed'
-  const competitor = arm % 2 === 0
+  const competitor = arm % 2 === 0 && profile !== 'sql-compile'
   let sql
   let close
   let pool

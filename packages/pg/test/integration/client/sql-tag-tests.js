@@ -63,6 +63,22 @@ suite.test('nested fragments renumber values without rewriting literal dollar re
   }
 })
 
+suite.test('deep sibling fragments preserve parameter order and literal dollar references', async () => {
+  const sql = helper.pg({ ...helper.config, max: 1 })
+  try {
+    const left = sql`${2}, ${sql`${3}, ${4}`}, ${5}`
+    const right = sql`${6}, ${sql`${7}, ${8}`}, ${9}`
+
+    assert.deepStrictEqual(await sql`SELECT ARRAY[${1}, ${left}, ${right}, ${10}]::int[] AS nums, '$1' AS literal`, [
+      { nums: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], literal: '$1' },
+    ])
+    assert.deepStrictEqual(await sql`SELECT ${sql`${sql.unsafe('11::int', [])}`} AS n`, [{ n: 11 }])
+    await assert.rejects(sql`SELECT ${sql`${sql`${sql.unsafe('$1::int', [1])}`}`}`.execute(), /cannot be nested/)
+  } finally {
+    await sql.end()
+  }
+})
+
 suite.test('lazy writes execute once across execute, repeated await and promise assimilation', async () => {
   const sql = helper.pg({ ...helper.config, max: 1 })
   try {

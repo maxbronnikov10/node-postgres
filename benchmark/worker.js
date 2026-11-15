@@ -313,9 +313,13 @@ const main = async () => {
   const profile = process.env.PG_BENCH_PROFILE || 'regression'
   let workload
   if (
-    ['postgresjs', 'postgresjs-unprepared', 'postgresjs-unprepared-infer', 'postgresjs-unprepared-typed'].includes(
-      profile
-    )
+    [
+      'postgresjs',
+      'postgresjs-unprepared',
+      'postgresjs-unprepared-infer',
+      'postgresjs-unprepared-typed',
+      'sql-compile',
+    ].includes(profile)
   ) {
     workload = await require('./postgresjs').createPostgresJsWorkload({
       profile,

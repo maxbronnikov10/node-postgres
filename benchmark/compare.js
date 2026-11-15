@@ -144,6 +144,10 @@ const markdown = ({ labels, rows, rounds, duration, profile }) => {
     lines.push(
       'Same candidate checkout. Base/base2: default int4 text parser. Head/head2: opt-in types override, text OID 23 -> Number; binary and every other OID delegate to pg.types.getTypeParser. All arms: QueryExecutor max 4, depth 16, maxPending 1024, maxAutoPrepare 16, identical result budgets, four warmed frontends, object rows and 16 concurrent queries. Only the 500-row SELECT with two int4 columns runs; identical SQL and named preparation, every field of every row checked. This measures canonical PostgreSQL int4 text in a bulk workload; it does not imply a general parsing improvement or a change to int8/numeric.'
     )
+  } else if (profile === 'sql-compile') {
+    lines.push(
+      'Before/after SQL-tag compiler. Four warmed connections, depth 16, prepared statements, identical SQL and checked results. Two independent processes per checkout measure same-code noise.'
+    )
   } else if (POSTGRESJS_PROFILES.includes(profile)) {
     if (profile === 'postgresjs') {
       lines.push(
@@ -174,13 +178,13 @@ const markdown = ({ labels, rows, rounds, duration, profile }) => {
       'Same checkout. Base: pipeline false. Head: pipeline true. Both use maxAutoPrepare 16; no BEGIN. One client, concurrency: 16.'
     )
   }
-  if (POSTGRESJS_PROFILES.includes(profile))
+  if (POSTGRESJS_PROFILES.includes(profile) || profile === 'sql-compile')
     lines.push('Controls above 10% make a row inconclusive even when every ratio is faster or slower.')
   lines.push('')
   lines.push(`| Scenario | Base ${unit} | Head ${unit} | Head / base | Rounds | Noise |`)
   lines.push('| --- | ---: | ---: | ---: | ---: | ---: |')
   for (const row of rows) {
-    const valid = !POSTGRESJS_PROFILES.includes(profile) || row.noise <= 0.1
+    const valid = !(POSTGRESJS_PROFILES.includes(profile) || profile === 'sql-compile') || row.noise <= 0.1
     const mark = row.notable && valid ? (row.speedup < 1 ? ' :eyes:' : ' :trophy:') : ''
     const change = row.notable && valid ? `**${percent(row.speedup)}**` : percent(row.speedup)
     lines.push(
@@ -232,6 +236,7 @@ const main = async () => {
       'executor-regression',
       'executor-row-mode',
       'executor-int-parser',
+      'sql-compile',
       ...POSTGRESJS_PROFILES,
     ].includes(profile)
   ) {
@@ -277,7 +282,7 @@ const main = async () => {
       throw new Error(`unknown scenario: ${args.scenario}; available: ${scenarios.join('; ')}`)
     }
     await arms.base.send({ type: 'setup' })
-    if (POSTGRESJS_PROFILES.includes(profile))
+    if (POSTGRESJS_PROFILES.includes(profile) || profile === 'sql-compile')
       await Promise.all(names.map((name) => arms[name].send({ type: 'prepare' })))
 
     const ratio = (qps, over, under) => qps[over].map((value, i) => value / qps[under][i])
@@ -339,6 +344,23 @@ const main = async () => {
           {
             schemaVersion: 1,
             profile,
+            ...(profile === 'sql-compile'
+              ? {
+                  comparison: {
+                    arms: {
+                      base: 'pg.postgres before',
+                      base2: 'pg.postgres before',
+                      head: 'pg.postgres after',
+                      head2: 'pg.postgres after',
+                    },
+                    connections: 4,
+                    maxPipeline: 16,
+                    prepare: true,
+                    controlQualityLimit: 0.1,
+                  },
+                  actorMetadata: Object.fromEntries(names.map((name, i) => [name, ready[i].metadata || null])),
+                }
+              : {}),
             ...(POSTGRESJS_PROFILES.includes(profile)
               ? {
                   comparison: {

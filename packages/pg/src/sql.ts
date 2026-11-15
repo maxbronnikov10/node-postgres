@@ -57,26 +57,29 @@ export class PendingQuery<R extends object = QueryResultRow> implements PromiseL
     private readonly fragment: { parts: readonly Part[]; unsafeValues?: readonly unknown[] }
   ) {}
 
-  private flatten(): readonly FragmentPart[] {
-    this.scope.assertOpen()
-    if (this.fragment.unsafeValues?.length) throw new TypeError('Parameterized unsafe queries cannot be nested')
-    return this.fragment.parts.flatMap((part) => (part instanceof PendingQuery ? part.flatten() : [part]))
-  }
-
-  private compile(): { text: string; values: unknown[] } {
+  private compile(offset = 0): { text: string; values: unknown[] } {
     this.scope.assertOpen()
     if (this.fragment.unsafeValues !== undefined) {
       return { text: this.fragment.parts[0] as string, values: this.fragment.unsafeValues.slice() }
     }
     const values: unknown[] = []
-    const text = this.flatten()
-      .map((part) => {
-        if (typeof part === 'string') return part
-        if (part instanceof SqlIdentifier) return part.toString()
+    let text = ''
+    for (const part of this.fragment.parts) {
+      if (typeof part === 'string') {
+        text += part
+      } else if (part instanceof SqlIdentifier) {
+        text += part.toString()
+      } else if (part instanceof PendingQuery) {
+        part.scope.assertOpen()
+        if (part.fragment.unsafeValues?.length) throw new TypeError('Parameterized unsafe queries cannot be nested')
+        const nested = part.compile(offset + values.length)
+        text += nested.text
+        for (const value of nested.values) values.push(value)
+      } else {
         values.push(part.value)
-        return '$' + values.length
-      })
-      .join('')
+        text += '$' + (offset + values.length)
+      }
+    }
     return { text, values }
   }
 
