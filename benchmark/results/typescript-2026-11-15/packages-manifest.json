@@ -1,0 +1,58 @@
+{
+  "sourceCommit": "e9b6ab8efb70c6a4fc089918d6a96c01ff073044",
+  "sourceTree": "175fb48d3333e3b0a02b88f2e0f98587d761ea14",
+  "node": "v22.22.1",
+  "npm": "10.9.4",
+  "defaultInstall": [
+    "pg",
+    "pg-protocol",
+    "pg-pool",
+    "pg-cursor",
+    "pg-query-stream",
+    "pg-connection-string",
+    "pg-cloudflare"
+  ],
+  "packages": {
+    "pg": {
+      "version": "8.23.1-perf.20261114.ge9b6ab8efb70",
+      "filename": "pg-8.23.1-perf.20261114.ge9b6ab8efb70.tgz",
+      "sha256": "a9f50e3c70b9f659215130def689c9d41296a40d734cdce04306968a4ed93325"
+    },
+    "pg-protocol": {
+      "version": "1.16.1-perf.20261114.ge9b6ab8efb70",
+      "filename": "pg-protocol-1.16.1-perf.20261114.ge9b6ab8efb70.tgz",
+      "sha256": "ef18bd9590404d17a1934f8b812f79b8328e2aac67bf6fe182985a39e9521246"
+    },
+    "pg-pool": {
+      "version": "3.14.0-perf.20261114.ge9b6ab8efb70",
+      "filename": "pg-pool-3.14.0-perf.20261114.ge9b6ab8efb70.tgz",
+      "sha256": "457410d0737afb2831e1035af977f7d3a3bebc5b51a98b5af6a7571019151c44"
+    },
+    "pg-cursor": {
+      "version": "2.22.1-perf.20261114.ge9b6ab8efb70",
+      "filename": "pg-cursor-2.22.1-perf.20261114.ge9b6ab8efb70.tgz",
+      "sha256": "e1c87cf875c5afb8cc4af648a549a68cc897d219d1014baaf7af8af3abbfc91e"
+    },
+    "pg-query-stream": {
+      "version": "4.17.1-perf.20261114.ge9b6ab8efb70",
+      "filename": "pg-query-stream-4.17.1-perf.20261114.ge9b6ab8efb70.tgz",
+      "sha256": "b48025462ff0ab656d91b38db9feed0ae95fdf88874a645436eb9112f323a66f"
+    },
+    "pg-connection-string": {
+      "version": "2.14.1-perf.20261114.ge9b6ab8efb70",
+      "filename": "pg-connection-string-2.14.1-perf.20261114.ge9b6ab8efb70.tgz",
+      "sha256": "eb1d9e309bd33bead9e5a5625598fd54804e25ea7a700d6377f320013b1226c6"
+    },
+    "pg-cloudflare": {
+      "version": "1.4.1-perf.20261114.ge9b6ab8efb70",
+      "filename": "pg-cloudflare-1.4.1-perf.20261114.ge9b6ab8efb70.tgz",
+      "sha256": "7310df747958a7431df357f5d96b14dc1cd296fede630b6c46e4359667c39c95"
+    },
+    "pg-native": {
+      "version": "3.9.1-perf.20261114.ge9b6ab8efb70",
+      "filename": "pg-native-3.9.1-perf.20261114.ge9b6ab8efb70.tgz",
+      "sha256": "cf10c81722b936154065e88a0ee412951a516fc7fcafae6d49dced7c36ca5498"
+    }
+  },
+  "limitations": "Experimental coordinated set. pg-native is optional, excluded from the JS check, and needs libpq builds."
+}

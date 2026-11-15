@@ -1,0 +1,53 @@
+{
+  "runtimeLocal": "181702e26b361ce6f6812321fc78a401f492ae8e",
+  "runtimeRemote": "e9b6ab8efb70c6a4fc089918d6a96c01ff073044",
+  "runtimeTree": "175fb48d3333e3b0a02b88f2e0f98587d761ea14",
+  "javascriptBaseline": "fdba8c23136b567a9d8b9245736595ab95268997",
+  "javascriptBaselineTree": "949c25bace8cdb54e6aadef02cb82b66b1fa49b5",
+  "harnessLocal": "9b208dd93fd6b8af5c1fc4c0072c597ba6f2efbb",
+  "harnessRemote": "ea37f3ee516af568831e6c68bebeff1408128801",
+  "harnessTree": "b796e594df22749bc128c202c77ffbb4de8487ea",
+  "ciRun": 43656536146,
+  "benchmarkRun": 43658197658,
+  "runAttempt": 1,
+  "conclusion": "success",
+  "artifacts": [
+    {
+      "id": 14139566239,
+      "name": "reproducible-trial-3-1",
+      "sha256": "57d5770cbd599e0d81afdc7e2f8ef536bd3f3d4a81f9fd96759e1ce0af9e292a",
+      "sizeInBytes": 24144
+    },
+    {
+      "id": 14138479401,
+      "name": "reproducible-trial-1-1",
+      "sha256": "4ec4e39332e093bb8e71a9cc23cf5d5e917f006bc2f7133cace91f9adf35b823",
+      "sizeInBytes": 24321
+    },
+    {
+      "id": 14138469760,
+      "name": "coordinated-packages-1",
+      "sha256": "3417516812ed55fd7ea397a1482f036bf5c369a50c5fefb4fa704a61c0bd24a6",
+      "sizeInBytes": 145106
+    },
+    {
+      "id": 14138169903,
+      "name": "reproducible-trial-2-1",
+      "sha256": "239341cad7d7a1a5e435c58267499cee979f954947a0473e42059014b7f8661d",
+      "sizeInBytes": 24289
+    },
+    {
+      "id": 14137989272,
+      "name": "reproducible-regressions-1",
+      "sha256": "3f7365973fcce42145af33e19a8499890d879700772aec63c27cd67712ce7422",
+      "sizeInBytes": 50927
+    }
+  ],
+  "localSmokeExcluded": {
+    "profiles": ["executor-row-mode", "executor-int-parser"],
+    "reason": "One round of 0.1s for functional checks only; no performance inference."
+  },
+  "localRegressionHistory": "An obsolete @ts-expect-error in query-stream/client-options.ts rejected the now valid Client.types option. Removed that suppression; remaining stream/native/workerd/TLS/CLI checks passed. All 1052 runtime cases and public type checks then passed.",
+  "jsonCopies": "Repository JSON may be formatted; every source field and sample value is preserved. Archive digests refer to original ZIP files.",
+  "resourceScope": "Standard public GitHub Ubuntu 24.04 4-vCPU runners; no student-credit activation or npm publication."
+}

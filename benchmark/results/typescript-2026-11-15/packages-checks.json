@@ -1,0 +1,15 @@
+{
+  "runId": 43658197658,
+  "sourceCommit": "e9b6ab8efb70c6a4fc089918d6a96c01ff073044",
+  "sourceTree": "175fb48d3333e3b0a02b88f2e0f98587d761ea14",
+  "jobId": 132641879949,
+  "jobUrl": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43658197658/job/132641879949",
+  "conclusion": "success",
+  "assertionLog": [
+    "2026-11-15T00:30:01.0940450Z All eight tarballs are byte-reproducible",
+    "2026-11-15T00:30:02.0566308Z PASS: isolated versions, no source links, CJS/ESM, executor recovery, binary int4, cursor, query-stream",
+    "2026-11-15T00:30:13.5798201Z PASS packaged CJS/ESM types",
+    "2026-11-15T00:30:17.1951613Z PASS optional native packaged consumer"
+  ],
+  "limitations": "JavaScript archives and optional native client checked separately; QueryExecutor is JavaScript only. Node type tooling supplied separately for packaged type-check. No npm registry publication."
+}

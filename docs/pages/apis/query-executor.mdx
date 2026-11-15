@@ -20,7 +20,7 @@ try {
   const users = await Promise.all(
     [1, 2, 3].map((id) => executor.maybeOne<User>('SELECT id, name FROM users WHERE id = $1', [id]))
   )
-  console.log(users)
+  console.log(users.filter((user) => user !== null).length)
 } finally {
   await executor.end()
 }

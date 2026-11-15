@@ -1,0 +1,131 @@
+{
+  "totalSamples": 4186,
+  "frames": [
+    {
+      "function": "utf8Slice",
+      "file": "",
+      "line": 0,
+      "samples": 682,
+      "selfPct": 16.29
+    },
+    {
+      "function": "slice",
+      "file": "node:buffer",
+      "line": 640,
+      "samples": 388,
+      "selfPct": 9.27
+    },
+    {
+      "function": "_handleDataRow",
+      "file": "file:///home/administrator/node-postgres-review-2026-11-13-feat-typescript-query-api/packages/pg/dist/client.js",
+      "line": 416,
+      "samples": 334,
+      "selfPct": 7.98
+    },
+    {
+      "function": "(idle)",
+      "file": "",
+      "line": 0,
+      "samples": 325,
+      "selfPct": 7.76
+    },
+    {
+      "function": "parseDataRowMessage",
+      "file": "file:///home/administrator/node-postgres-review-2026-11-13-feat-typescript-query-api/packages/pg-protocol/dist/parser.js",
+      "line": 268,
+      "samples": 310,
+      "selfPct": 7.41
+    },
+    {
+      "function": "parseInteger",
+      "file": "file:///home/administrator/node-postgres-review-2026-11-13/node_modules/pg-types/lib/textParsers.js",
+      "line": 109,
+      "samples": 308,
+      "selfPct": 7.36
+    },
+    {
+      "function": "parse",
+      "file": "file:///home/administrator/node-postgres-review-2026-11-13-feat-typescript-query-api/packages/pg-protocol/dist/parser.js",
+      "line": 46,
+      "samples": 245,
+      "selfPct": 5.85
+    },
+    {
+      "function": "writev",
+      "file": "",
+      "line": 0,
+      "samples": 192,
+      "selfPct": 4.59
+    },
+    {
+      "function": "handlePacket",
+      "file": "file:///home/administrator/node-postgres-review-2026-11-13-feat-typescript-query-api/packages/pg-protocol/dist/parser.js",
+      "line": 124,
+      "samples": 187,
+      "selfPct": 4.47
+    },
+    {
+      "function": "parseRow",
+      "file": "file:///home/administrator/node-postgres-review-2026-11-13-feat-typescript-query-api/packages/pg/dist/result.js",
+      "line": 63,
+      "samples": 179,
+      "selfPct": 4.28
+    },
+    {
+      "function": "emit",
+      "file": "node:events",
+      "line": 466,
+      "samples": 136,
+      "selfPct": 3.25
+    },
+    {
+      "function": "(program)",
+      "file": "",
+      "line": 0,
+      "samples": 119,
+      "selfPct": 2.84
+    },
+    {
+      "function": "onData",
+      "file": "file:///home/administrator/node-postgres-review-2026-11-13-feat-typescript-query-api/packages/pg-protocol/dist/index.js",
+      "line": 42,
+      "samples": 82,
+      "selfPct": 1.96
+    },
+    {
+      "function": "(garbage collector)",
+      "file": "",
+      "line": 0,
+      "samples": 79,
+      "selfPct": 1.89
+    },
+    {
+      "function": "addFields",
+      "file": "file:///home/administrator/node-postgres-review-2026-11-13-feat-typescript-query-api/packages/pg/dist/result.js",
+      "line": 125,
+      "samples": 64,
+      "selfPct": 1.53
+    },
+    {
+      "function": "",
+      "file": "file:///home/administrator/node-postgres-review-2026-11-13-feat-typescript-query-api/benchmark/executor.js",
+      "line": 34,
+      "samples": 54,
+      "selfPct": 1.29
+    },
+    {
+      "function": "_consumeResult",
+      "file": "file:///home/administrator/node-postgres-review-2026-11-13-feat-typescript-query-api/packages/pg/dist/query-executor.js",
+      "line": 308,
+      "samples": 49,
+      "selfPct": 1.17
+    },
+    {
+      "function": "_pump",
+      "file": "file:///home/administrator/node-postgres-review-2026-11-13-feat-typescript-query-api/packages/pg/dist/query-executor.js",
+      "line": 364,
+      "samples": 48,
+      "selfPct": 1.15
+    }
+  ]
+}

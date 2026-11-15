@@ -32,7 +32,7 @@ interface User {
 const db = new QueryExecutor({ connectionString: process.env.DATABASE_URL })
 try {
   const user = await db.maybeOne<User>('SELECT id, name FROM users WHERE id = $1', [42])
-  console.log(user?.name)
+  console.log({ found: user !== null })
 } finally {
   await db.end()
 }
