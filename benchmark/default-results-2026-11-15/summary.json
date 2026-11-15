@@ -1,0 +1,656 @@
+{
+  "sourceCommit": "efbc5432bac021deed99e901dc1c414893ff0f4b",
+  "sourceTree": "f8c41c63fc270ca36c4d8cdf20f7d17ba1d1c2c2",
+  "benchmarkRun": 43715536595,
+  "ciRun": 43715536553,
+  "trials": [
+    {
+      "trial": 1,
+      "transport": "tcp",
+      "cpu": {
+        "model": "Intel(R) Xeon(R) 6975P-C",
+        "cores": 4
+      },
+      "artifact": {
+        "id": 14163305950,
+        "name": "default-throughput-1-tcp",
+        "digest": "sha256:05e5490eb74b4ff19f4fe1ea536d9fb91c04251ca0d16028c31d37a4e6aa5e83",
+        "size": 17275
+      },
+      "comparisons": [
+        {
+          "name": "tagged point SELECT, sequential",
+          "base": 14416.71347741626,
+          "head": 13087.573428382551,
+          "speedup": 0.920363089979567,
+          "min": 0.8822093587053577,
+          "max": 0.9556562598211827,
+          "noise": 0.06018723707782181,
+          "qualified": true
+        },
+        {
+          "name": "tagged point SELECT, concurrent x16",
+          "base": 53549.785928583326,
+          "head": 42181.81931987872,
+          "speedup": 0.7873427511994526,
+          "min": 0.772647637463127,
+          "max": 0.8121398458731773,
+          "noise": 0.025417781627204095,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row object SELECT, concurrent x16",
+          "base": 9561.203228569937,
+          "head": 7889.25087067787,
+          "speedup": 0.8227972015338603,
+          "min": 0.8155452223537984,
+          "max": 0.8312674360236058,
+          "noise": 0.014424855265507741,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row array SELECT, concurrent x16",
+          "base": 9131.23702085386,
+          "head": 7560.878714542079,
+          "speedup": 0.8289237042258433,
+          "min": 0.823221915551919,
+          "max": 0.8354812531617757,
+          "noise": 0.009742568676025742,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row mixed SELECT, concurrent x16",
+          "base": 2014.4995460326672,
+          "head": 1591.7551665700048,
+          "speedup": 0.7889921132432808,
+          "min": 0.7779207054486919,
+          "max": 0.798455273389111,
+          "noise": 0.018292280106007808,
+          "qualified": true
+        },
+        {
+          "name": "tagged 1-MiB bytea input, concurrent x2",
+          "base": 238.64264637167744,
+          "head": 787.6958244912184,
+          "speedup": 3.299042521912491,
+          "min": 3.219057776727234,
+          "max": 3.3831550105119956,
+          "noise": 0.05609130130562945,
+          "qualified": true
+        },
+        {
+          "name": "tagged logged UPDATE, concurrent x16",
+          "base": 20358.463399822806,
+          "head": 18076.83750435325,
+          "speedup": 0.8876320305156382,
+          "min": 0.8743109452874064,
+          "max": 0.9034759753941379,
+          "noise": 0.04089801342270749,
+          "qualified": true
+        }
+      ],
+      "load": {
+        "offered": 900000,
+        "completed": 900000,
+        "failed": 0,
+        "rejections": 0,
+        "latency": {
+          "count": 900000,
+          "p50Millis": 0.807,
+          "p95Millis": 1.438,
+          "p99Millis": 1.759,
+          "maxMillis": 7.135
+        },
+        "counterVerification": {
+          "expected": 108000,
+          "actual": 108000
+        }
+      },
+      "beforeAfter": {
+        "base": 41326.302827742285,
+        "head": 42849.90644600193,
+        "speedup": 1.0366237293145506,
+        "noise": 0.024028158873759198,
+        "min": 1.024160313114853,
+        "max": 1.0576654765472637,
+        "qualified": true
+      }
+    },
+    {
+      "trial": 1,
+      "transport": "tls",
+      "cpu": {
+        "model": "Intel(R) Xeon(R) 6975P-C",
+        "cores": 4
+      },
+      "artifact": {
+        "id": 14163161423,
+        "name": "default-throughput-1-tls",
+        "digest": "sha256:c759cd61f83377609cb514097eb16f70aca0b363a98f0319687c61cc7997a743",
+        "size": 15388
+      },
+      "comparisons": [
+        {
+          "name": "tagged point SELECT, sequential",
+          "base": 134.17510463593015,
+          "head": 133.0403373905628,
+          "speedup": 1.0178704055483232,
+          "min": 0.9580371271174704,
+          "max": 1.0251075287096052,
+          "noise": 0.05864327490686305,
+          "qualified": false
+        },
+        {
+          "name": "tagged point SELECT, concurrent x16",
+          "base": 2263.1648787660492,
+          "head": 2221.552341091447,
+          "speedup": 0.9884908676912463,
+          "min": 0.9683624212245094,
+          "max": 0.9924835700805945,
+          "noise": 0.018338131792283274,
+          "qualified": false
+        },
+        {
+          "name": "tagged 500-row object SELECT, concurrent x16",
+          "base": 1870.0666087273653,
+          "head": 1802.512449062136,
+          "speedup": 0.9651530523854706,
+          "min": 0.9579608116436334,
+          "max": 0.9683457725862044,
+          "noise": 0.009234367050508174,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row array SELECT, concurrent x16",
+          "base": 1814.0666001373713,
+          "head": 1769.0547640082877,
+          "speedup": 0.9760342250164973,
+          "min": 0.9713329442623768,
+          "max": 0.9795161229049327,
+          "noise": 0.008097954853800604,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row mixed SELECT, concurrent x16",
+          "base": 1008.0283555320743,
+          "head": 928.5397840427722,
+          "speedup": 0.9219113707283235,
+          "min": 0.9079412098116735,
+          "max": 0.9342732371153,
+          "noise": 0.020709416658788116,
+          "qualified": true
+        },
+        {
+          "name": "tagged 1-MiB bytea input, concurrent x2",
+          "base": 43.72193316952864,
+          "head": 82.62431323311014,
+          "speedup": 1.8767222758533362,
+          "min": 1.829429981286338,
+          "max": 2.017863625054197,
+          "noise": 0.09044297718879035,
+          "qualified": true
+        },
+        {
+          "name": "tagged logged UPDATE, concurrent x16",
+          "base": 2066.43145898421,
+          "head": 2052.5047588512725,
+          "speedup": 0.991386834448368,
+          "min": 0.9812766037110933,
+          "max": 1.0021698855182943,
+          "noise": 0.011978712270334979,
+          "qualified": false
+        }
+      ],
+      "load": {
+        "offered": 900000,
+        "completed": 900000,
+        "failed": 0,
+        "rejections": 0,
+        "latency": {
+          "count": 900000,
+          "p50Millis": 8.423,
+          "p95Millis": 10.847,
+          "p99Millis": 41.599,
+          "maxMillis": 60.511
+        },
+        "counterVerification": {
+          "expected": 108000,
+          "actual": 108000
+        }
+      }
+    },
+    {
+      "trial": 2,
+      "transport": "tcp",
+      "cpu": {
+        "model": "AMD EPYC 7763 64-Core Processor",
+        "cores": 4
+      },
+      "artifact": {
+        "id": 14163281051,
+        "name": "default-throughput-2-tcp",
+        "digest": "sha256:4ecfef29de13d2e4d25e7df4de44a538310e33bac40646571309c5ce302165db",
+        "size": 17219
+      },
+      "comparisons": [
+        {
+          "name": "tagged point SELECT, sequential",
+          "base": 4888.670084001313,
+          "head": 4327.8216667394845,
+          "speedup": 0.8869693339502682,
+          "min": 0.8706076112794254,
+          "max": 0.8934718658478151,
+          "noise": 0.02291889719792506,
+          "qualified": true
+        },
+        {
+          "name": "tagged point SELECT, concurrent x16",
+          "base": 17647.47805004221,
+          "head": 15763.505024672406,
+          "speedup": 0.8959931579997122,
+          "min": 0.8741086462646446,
+          "max": 0.9107990168200795,
+          "noise": 0.016200204524050577,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row object SELECT, concurrent x16",
+          "base": 5109.486012044955,
+          "head": 4413.194172374666,
+          "speedup": 0.8608675687367146,
+          "min": 0.8437699376325587,
+          "max": 0.8902631273590276,
+          "noise": 0.03593079292451318,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row array SELECT, concurrent x16",
+          "base": 4816.750496347815,
+          "head": 4291.341372407413,
+          "speedup": 0.8888736338055758,
+          "min": 0.8842714815245729,
+          "max": 0.9008145326709118,
+          "noise": 0.020100722880492583,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row mixed SELECT, concurrent x16",
+          "base": 985.5725603904909,
+          "head": 828.1331500567866,
+          "speedup": 0.8400479468147986,
+          "min": 0.8246265679334813,
+          "max": 0.8468331140704701,
+          "noise": 0.02193627834680778,
+          "qualified": true
+        },
+        {
+          "name": "tagged 1-MiB bytea input, concurrent x2",
+          "base": 161.7861638012265,
+          "head": 512.6814613761699,
+          "speedup": 3.176034988749533,
+          "min": 3.0926209794213606,
+          "max": 3.395393066146968,
+          "noise": 0.12388066429564804,
+          "qualified": false
+        },
+        {
+          "name": "tagged logged UPDATE, concurrent x16",
+          "base": 8368.138688238598,
+          "head": 7782.540839623496,
+          "speedup": 0.9332564647268482,
+          "min": 0.9247391580026509,
+          "max": 0.9826992273731838,
+          "noise": 0.056879819147306554,
+          "qualified": true
+        }
+      ],
+      "load": {
+        "offered": 900000,
+        "completed": 900000,
+        "failed": 0,
+        "rejections": 0,
+        "latency": {
+          "count": 900000,
+          "p50Millis": 0.925,
+          "p95Millis": 1.695,
+          "p99Millis": 2.143,
+          "maxMillis": 14.175
+        },
+        "counterVerification": {
+          "expected": 108000,
+          "actual": 108000
+        }
+      },
+      "beforeAfter": {
+        "base": 15447.033924942116,
+        "head": 15894.254729944212,
+        "speedup": 1.0241840176232735,
+        "noise": 0.026572320209372613,
+        "min": 1.0142700471064905,
+        "max": 1.0358346186793908,
+        "qualified": false
+      }
+    },
+    {
+      "trial": 2,
+      "transport": "tls",
+      "cpu": {
+        "model": "Intel(R) Xeon(R) 6975P-C",
+        "cores": 4
+      },
+      "artifact": {
+        "id": 14163057405,
+        "name": "default-throughput-2-tls",
+        "digest": "sha256:2f7ac030769d3ad96ffc2b5263c258c39ce3b72af308f5ac5672dc6e784b6418",
+        "size": 15356
+      },
+      "comparisons": [
+        {
+          "name": "tagged point SELECT, sequential",
+          "base": 134.38926622240126,
+          "head": 132.87071370823446,
+          "speedup": 0.9987309413622013,
+          "min": 0.860170988483308,
+          "max": 1.023769092999654,
+          "noise": 0.1934341226639298,
+          "qualified": false
+        },
+        {
+          "name": "tagged point SELECT, concurrent x16",
+          "base": 2227.214925936446,
+          "head": 2196.5132652285365,
+          "speedup": 0.9855404068532033,
+          "min": 0.9833467582761011,
+          "max": 0.9876373119303811,
+          "noise": 0.02338150315848253,
+          "qualified": false
+        },
+        {
+          "name": "tagged 500-row object SELECT, concurrent x16",
+          "base": 1830.391629064995,
+          "head": 1770.4259417416135,
+          "speedup": 0.9656263280143661,
+          "min": 0.9558586161999361,
+          "max": 0.9905357303011169,
+          "noise": 0.02354842521297318,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row array SELECT, concurrent x16",
+          "base": 1799.5094349674891,
+          "head": 1757.072028166319,
+          "speedup": 0.9758429156886004,
+          "min": 0.956917109722293,
+          "max": 0.9809830195254479,
+          "noise": 0.02968022751940802,
+          "qualified": false
+        },
+        {
+          "name": "tagged 500-row mixed SELECT, concurrent x16",
+          "base": 1003.4636760948671,
+          "head": 918.7811824907008,
+          "speedup": 0.9161032949605143,
+          "min": 0.9009776454416326,
+          "max": 0.9306875626524733,
+          "noise": 0.01632078612688881,
+          "qualified": true
+        },
+        {
+          "name": "tagged 1-MiB bytea input, concurrent x2",
+          "base": 42.657980687091666,
+          "head": 81.68128818983607,
+          "speedup": 1.9086433572366035,
+          "min": 1.8798345471847433,
+          "max": 1.931326309095847,
+          "noise": 0.016890206558518805,
+          "qualified": true
+        },
+        {
+          "name": "tagged logged UPDATE, concurrent x16",
+          "base": 2064.449548861322,
+          "head": 2043.510097607436,
+          "speedup": 0.9884962732561473,
+          "min": 0.9838156709836042,
+          "max": 0.9947641169937743,
+          "noise": 0.01347367612364847,
+          "qualified": false
+        }
+      ],
+      "load": {
+        "offered": 900000,
+        "completed": 900000,
+        "failed": 0,
+        "rejections": 0,
+        "latency": {
+          "count": 900000,
+          "p50Millis": 8.447,
+          "p95Millis": 10.967,
+          "p99Millis": 41.951,
+          "maxMillis": 57.663
+        },
+        "counterVerification": {
+          "expected": 108000,
+          "actual": 108000
+        }
+      }
+    },
+    {
+      "trial": 3,
+      "transport": "tcp",
+      "cpu": {
+        "model": "Intel(R) Xeon(R) 6975P-C",
+        "cores": 4
+      },
+      "artifact": {
+        "id": 14163320991,
+        "name": "default-throughput-3-tcp",
+        "digest": "sha256:21653a6359877b6a7d6f73bc2355f5484aaaca3523af40c61bfe9319796efca3",
+        "size": 17351
+      },
+      "comparisons": [
+        {
+          "name": "tagged point SELECT, sequential",
+          "base": 14999.187427355078,
+          "head": 13827.427063380692,
+          "speedup": 0.9112794225624874,
+          "min": 0.894455772983243,
+          "max": 1.0060159777735365,
+          "noise": 0.0697131220741174,
+          "qualified": false
+        },
+        {
+          "name": "tagged point SELECT, concurrent x16",
+          "base": 56067.44720147828,
+          "head": 43317.138916964686,
+          "speedup": 0.7727037191467061,
+          "min": 0.7681068138851193,
+          "max": 0.7902123392141911,
+          "noise": 0.01673789590480701,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row object SELECT, concurrent x16",
+          "base": 11549.423731576666,
+          "head": 9155.010752042672,
+          "speedup": 0.7921441674366372,
+          "min": 0.7777332858044252,
+          "max": 0.7985970679553842,
+          "noise": 0.018462184102137735,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row array SELECT, concurrent x16",
+          "base": 10979.41267684675,
+          "head": 8705.244842713751,
+          "speedup": 0.7932076219286246,
+          "min": 0.7848137649402461,
+          "max": 0.8001283797496342,
+          "noise": 0.016871775622686047,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row mixed SELECT, concurrent x16",
+          "base": 2056.4425690762746,
+          "head": 1618.9279325350303,
+          "speedup": 0.7876010284214237,
+          "min": 0.7796945187706519,
+          "max": 0.798066914439751,
+          "noise": 0.021222914819760907,
+          "qualified": true
+        },
+        {
+          "name": "tagged 1-MiB bytea input, concurrent x2",
+          "base": 240.35991846554447,
+          "head": 796.2399797534747,
+          "speedup": 3.3008773055949425,
+          "min": 3.2334813465122956,
+          "max": 3.369851558964608,
+          "noise": 0.06003136226243433,
+          "qualified": true
+        },
+        {
+          "name": "tagged logged UPDATE, concurrent x16",
+          "base": 20464.976902400093,
+          "head": 18496.03190733193,
+          "speedup": 0.9026011864455288,
+          "min": 0.8405026638646655,
+          "max": 0.9116672636274034,
+          "noise": 0.04005683629739332,
+          "qualified": true
+        }
+      ],
+      "load": {
+        "offered": 900000,
+        "completed": 900000,
+        "failed": 0,
+        "rejections": 0,
+        "latency": {
+          "count": 900000,
+          "p50Millis": 0.8,
+          "p95Millis": 1.418,
+          "p99Millis": 1.75,
+          "maxMillis": 6.691
+        },
+        "counterVerification": {
+          "expected": 108000,
+          "actual": 108000
+        }
+      },
+      "beforeAfter": {
+        "base": 41641.394991401874,
+        "head": 43552.07394898894,
+        "speedup": 1.0429030254926521,
+        "noise": 0.02474271056542654,
+        "min": 1.0276654774777394,
+        "max": 1.0530552891473006,
+        "qualified": true
+      }
+    },
+    {
+      "trial": 3,
+      "transport": "tls",
+      "cpu": {
+        "model": "AMD EPYC 7763 64-Core Processor",
+        "cores": 4
+      },
+      "artifact": {
+        "id": 14163525060,
+        "name": "default-throughput-3-tls",
+        "digest": "sha256:5bd5fde21223e2889284605d00b7e14bd71640c8d9030e6ba94a64e003382cd0",
+        "size": 15441
+      },
+      "comparisons": [
+        {
+          "name": "tagged point SELECT, sequential",
+          "base": 136.96922907547204,
+          "head": 135.537740204584,
+          "speedup": 0.9998493701656385,
+          "min": 0.9779698036074608,
+          "max": 1.0320661218946225,
+          "noise": 0.14749393566537572,
+          "qualified": false
+        },
+        {
+          "name": "tagged point SELECT, concurrent x16",
+          "base": 2028.3937116114862,
+          "head": 1985.365327877123,
+          "speedup": 0.9809386281670515,
+          "min": 0.9662218128645353,
+          "max": 0.9933844975908962,
+          "noise": 0.02720359259240479,
+          "qualified": false
+        },
+        {
+          "name": "tagged 500-row object SELECT, concurrent x16",
+          "base": 1585.5476942527162,
+          "head": 1531.3055023550692,
+          "speedup": 0.963726176204637,
+          "min": 0.9542054342599239,
+          "max": 0.9757734361879562,
+          "noise": 0.01155154632577593,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row array SELECT, concurrent x16",
+          "base": 1577.3168143539174,
+          "head": 1521.304487581158,
+          "speedup": 0.9659805453826906,
+          "min": 0.9489201503458662,
+          "max": 0.9860885018736901,
+          "noise": 0.02291999430097791,
+          "qualified": true
+        },
+        {
+          "name": "tagged 500-row mixed SELECT, concurrent x16",
+          "base": 636.180318163731,
+          "head": 587.4198227075815,
+          "speedup": 0.9173001313732018,
+          "min": 0.8885150448214242,
+          "max": 0.9328028489293514,
+          "noise": 0.02765520545230249,
+          "qualified": true
+        },
+        {
+          "name": "tagged 1-MiB bytea input, concurrent x2",
+          "base": 39.96230393240597,
+          "head": 77.90391352718746,
+          "speedup": 1.9477883812819226,
+          "min": 1.8927677244017933,
+          "max": 2.0070829531594163,
+          "noise": 0.06541586654198983,
+          "qualified": true
+        },
+        {
+          "name": "tagged logged UPDATE, concurrent x16",
+          "base": 1721.9547982820227,
+          "head": 1677.8153423136905,
+          "speedup": 0.976451687142081,
+          "min": 0.9696345924565887,
+          "max": 0.9895199755749774,
+          "noise": 0.03482955974730828,
+          "qualified": false
+        }
+      ],
+      "load": {
+        "offered": 900000,
+        "completed": 900000,
+        "failed": 0,
+        "rejections": 0,
+        "latency": {
+          "count": 900000,
+          "p50Millis": 9.239,
+          "p95Millis": 12.007,
+          "p99Millis": 48.959,
+          "maxMillis": 73.023
+        },
+        "counterVerification": {
+          "expected": 108000,
+          "actual": 108000
+        }
+      }
+    }
+  ],
+  "totalOffered": 5400000,
+  "totalCompleted": 5400000,
+  "totalVerifiedCounterIncrements": 648000
+}

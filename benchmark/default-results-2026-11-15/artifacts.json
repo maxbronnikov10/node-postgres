@@ -1,0 +1,38 @@
+[
+  {
+    "id": 14163525060,
+    "name": "default-throughput-3-tls",
+    "digest": "sha256:5bd5fde21223e2889284605d00b7e14bd71640c8d9030e6ba94a64e003382cd0",
+    "size": 15441
+  },
+  {
+    "id": 14163320991,
+    "name": "default-throughput-3-tcp",
+    "digest": "sha256:21653a6359877b6a7d6f73bc2355f5484aaaca3523af40c61bfe9319796efca3",
+    "size": 17351
+  },
+  {
+    "id": 14163305950,
+    "name": "default-throughput-1-tcp",
+    "digest": "sha256:05e5490eb74b4ff19f4fe1ea536d9fb91c04251ca0d16028c31d37a4e6aa5e83",
+    "size": 17275
+  },
+  {
+    "id": 14163281051,
+    "name": "default-throughput-2-tcp",
+    "digest": "sha256:4ecfef29de13d2e4d25e7df4de44a538310e33bac40646571309c5ce302165db",
+    "size": 17219
+  },
+  {
+    "id": 14163161423,
+    "name": "default-throughput-1-tls",
+    "digest": "sha256:c759cd61f83377609cb514097eb16f70aca0b363a98f0319687c61cc7997a743",
+    "size": 15388
+  },
+  {
+    "id": 14163057405,
+    "name": "default-throughput-2-tls",
+    "digest": "sha256:2f7ac030769d3ad96ffc2b5263c258c39ce3b72af308f5ac5672dc6e784b6418",
+    "size": 15356
+  }
+]
