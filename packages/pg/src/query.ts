@@ -7,7 +7,7 @@ import utils = require('./utils')
 import resultBudget = require('./query-result-budget')
 
 import type { Domain } from 'domain'
-import type { BackendMessage, Field, RawDataRowMessage } from 'pg-protocol/dist/messages'
+import type { BackendMessage, Field, RawDataRowMessage, RowDescriptionMessage } from 'pg-protocol/dist/messages'
 import type Connection = require('./connection')
 import type {
   CustomTypesConfig,
@@ -43,6 +43,7 @@ class Query<R extends object = QueryResultRow> extends EventEmitter {
   _canceledDueToError: PgError | false | undefined
   _accumulateRows: QueryCallback<R> | boolean | undefined
   _autoBatch?: boolean
+  _cachedRowDescription?: RowDescriptionMessage
   private _resultBudget: ((message: BackendMessage) => boolean) | undefined
 
   constructor(
@@ -304,10 +305,14 @@ class Query<R extends object = QueryResultRow> extends EventEmitter {
       return
     }
 
-    connection.describe({
-      type: 'P',
-      name: this.portal || '',
-    })
+    if (this._cachedRowDescription && !this.binary && this.hasBeenParsed(connection)) {
+      this.handleRowDescription(this._cachedRowDescription)
+    } else {
+      connection.describe({
+        type: 'P',
+        name: this.portal || '',
+      })
+    }
 
     this._getRows(connection, this.rows)
   }

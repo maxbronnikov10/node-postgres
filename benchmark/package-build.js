@@ -8,16 +8,7 @@ const os = require('node:os')
 const path = require('node:path')
 
 const root = process.cwd()
-const names = [
-  'pg',
-  'pg-protocol',
-  'pg-pool',
-  'pg-cursor',
-  'pg-query-stream',
-  'pg-connection-string',
-  'pg-cloudflare',
-  'pg-native',
-]
+const names = ['pg', 'pg-protocol', 'pg-pool', 'pg-connection-string']
 
 class PackageBuilder {
   run({ command, args, cwd = root }) {
@@ -100,10 +91,9 @@ class PackageBuilder {
         sourceTree: tree,
         node: process.version,
         npm: this.run({ command: 'npm', args: ['--version'] }),
-        defaultInstall: names.filter((name) => name !== 'pg-native'),
+        defaultInstall: names,
         packages,
-        limitations:
-          'Experimental coordinated set. pg-native is optional, excluded from the JS check, and needs libpq builds.',
+        limitations: 'Experimental coordinated Node.js package set. No native bindings or browser/worker adapters.',
       }
       fs.writeFileSync(path.join(output, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
       console.log(JSON.stringify(manifest, null, 2))

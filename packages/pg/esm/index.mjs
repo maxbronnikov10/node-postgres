@@ -2,6 +2,7 @@
 import pg from '../lib/index.js'
 
 // Re-export all the properties
+export const postgres = pg.postgres
 export const Client = pg.Client
 export const Pool = pg.Pool
 export const QueryExecutor = pg.QueryExecutor

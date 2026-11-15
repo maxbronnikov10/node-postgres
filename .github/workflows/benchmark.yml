@@ -1,87 +1,94 @@
-name: Benchmark
+name: SQL comparison
 
 on:
-  pull_request:
-    branches: [master]
   workflow_dispatch:
-    inputs:
-      base:
-        description: 'Ref to compare this branch against'
-        default: master
+  push:
+    branches: [feat/sql-tag-client]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.mdx'
+      - 'benchmark/results/**'
 
 permissions:
   contents: read
 
 jobs:
   benchmark:
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # the comment on the pull request. Read-only on a pull request from a fork, where the
-      # job summary is the only output
-      pull-requests: write
+    timeout-minutes: 40
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2, 3]
+    services:
+      postgres:
+        image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: benchmark
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      # the PostgreSQL that comes with the runner image, over its unix socket: no container
-      # and no TCP between the client and the server, so the numbers are the client's.
-      # The role is named after the OS user, which is what peer authentication wants
-      PGHOST: /var/run/postgresql
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
       PGDATABASE: benchmark
+      PG_BENCH_POSTGRESJS_MODULE: ${{ github.workspace }}/competitor/node_modules/postgres
     steps:
-      - name: Start PostgreSQL
-        run: |
-          sudo systemctl start postgresql.service
-          sudo -u postgres createuser "$USER"
-          sudo -u postgres createdb -O "$USER" benchmark
       - uses: actions/checkout@v4
         with:
-          path: head
           persist-credentials: false
-      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          path: base
-          ref: ${{ github.event.pull_request.base.sha || inputs.base }}
-          persist-credentials: false
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 26
+          node-version: 22.22.1
           cache: yarn
-          cache-dependency-path: |
-            head/yarn.lock
-            base/yarn.lock
-      - name: Build both arms
+      - name: Build and install pinned competitor
         run: |
-          for arm in base head; do
-            (cd $arm && yarn install --frozen-lockfile && yarn build)
-          done
-      - name: Run benchmark
-        working-directory: head
-        run: node benchmark/compare.js --base ../base --head . --rounds 4 --duration 3 --output ../benchmark_summary.md
-      - name: Publish the summary
-        run: cat benchmark_summary.md >> "$GITHUB_STEP_SUMMARY"
+          echo "PGPORT=${{ job.services.postgres.ports[5432] }}" >> "$GITHUB_ENV"
+          yarn install --frozen-lockfile
+          yarn build
+          yarn tsc -p packages/pg/tsconfig.types.json
+          npm install --prefix competitor --ignore-scripts --no-audit --no-fund --save-exact postgres@4.1.1
+          mkdir results
+          cp competitor/package-lock.json results/competitor-lock.json
+          npm view postgres@4.1.1 version gitHead dist.integrity --json > results/competitor-registry.json
+      - name: TCP comparison
+        run: >-
+          node benchmark/compare.js --base . --head . --profile postgresjs
+          --rounds 8 --duration 3 --warmup 2
+          --output results/tcp.md --json-output results/tcp.json
+      - name: Configure verified TLS fixture
+        env:
+          FIXTURE: ${{ job.services.postgres.id }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/sql-tls"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=localhost \
+            -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' \
+            -keyout "$RUNNER_TEMP/sql-tls/server.key" -out "$RUNNER_TEMP/sql-tls/server.crt" 2>/dev/null
+          chmod 600 "$RUNNER_TEMP/sql-tls/server.key"
+          docker exec "$FIXTURE" mkdir -p /tmp/sql-tls
+          docker cp "$RUNNER_TEMP/sql-tls/server.key" "$FIXTURE:/tmp/sql-tls/server.key"
+          docker cp "$RUNNER_TEMP/sql-tls/server.crt" "$FIXTURE:/tmp/sql-tls/server.crt"
+          docker exec "$FIXTURE" chown postgres:postgres /tmp/sql-tls/server.key /tmp/sql-tls/server.crt
+          docker exec "$FIXTURE" psql -U postgres -d benchmark -c "ALTER SYSTEM SET ssl='on'"
+          docker exec "$FIXTURE" psql -U postgres -d benchmark -c "ALTER SYSTEM SET ssl_cert_file='/tmp/sql-tls/server.crt'"
+          docker exec "$FIXTURE" psql -U postgres -d benchmark -c "ALTER SYSTEM SET ssl_key_file='/tmp/sql-tls/server.key'"
+          docker exec "$FIXTURE" psql -U postgres -d benchmark -c 'SELECT pg_reload_conf()'
+          echo "PG_BENCH_TLS_CA=$RUNNER_TEMP/sql-tls/server.crt" >> "$GITHUB_ENV"
+      - name: TLS 1.3 comparison with delayed relay
+        env:
+          PG_BENCH_DELAY_MS: 3
+        run: >-
+          node benchmark/compare.js --base . --head . --profile postgresjs
+          --rounds 8 --duration 3 --warmup 2
+          --output results/tls-relay.md --json-output results/tls-relay.json
+      - name: Summary
+        if: always()
+        run: cat results/*.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: benchmark-summary
-          path: benchmark_summary.md
-      - name: Comment on the pull request
-        if: github.event_name == 'pull_request'
-        continue-on-error: true
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs')
-            const marker = '<!-- benchmark-comment -->'
-            const body = fs.readFileSync('benchmark_summary.md', 'utf8')
-            const issue_number = context.payload.pull_request.number
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number,
-            })
-            const existing = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes(marker))
-            if (existing) {
-              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body })
-            } else {
-              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number, body })
-            }
+          name: sql-comparison-${{ matrix.trial }}
+          path: results/
+          retention-days: 1

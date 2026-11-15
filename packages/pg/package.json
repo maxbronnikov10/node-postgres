@@ -1,10 +1,9 @@
 {
   "name": "pg",
   "version": "8.23.1",
-  "description": "PostgreSQL client - pure javascript & libpq with the same API",
+  "description": "TypeScript PostgreSQL client with tagged SQL, transactions and bounded pipelining",
   "keywords": [
     "database",
-    "libpq",
     "pg",
     "postgre",
     "postgres",
@@ -51,26 +50,11 @@
     "pgpass": "1.0.5"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.8.23",
-    "@cloudflare/workers-types": "^4.20230404.0",
     "async": "2.6.4",
     "bluebird": "3.7.2",
     "co": "4.6.0",
     "pg-copy-streams": "0.3.0",
-    "typescript": "^6.0.3",
-    "vitest": "~3.0.9",
-    "wrangler": "^3.x"
-  },
-  "optionalDependencies": {
-    "pg-cloudflare": "^1.4.1"
-  },
-  "peerDependencies": {
-    "pg-native": ">=3.0.1"
-  },
-  "peerDependenciesMeta": {
-    "pg-native": {
-      "optional": true
-    }
+    "typescript": "^6.0.3"
   },
   "scripts": {
     "test": "make test-all",
@@ -85,7 +69,7 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">= 16.0.0"
+    "node": ">=20.5.0"
   },
   "types": "./dist/index.d.ts"
 }

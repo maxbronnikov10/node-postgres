@@ -1,13 +1,7 @@
 'use strict'
 const helper = require('./../test-helper')
-let { Client } = helper
+const { Client } = helper
 const assert = require('assert')
-
-if (helper.args.native) {
-  Client = require('./../../lib/native')
-  helper.Client = Client
-  helper.pg = require('../../lib').native
-}
 
 // creates a client from cli parameters
 helper.client = function (cb, options) {

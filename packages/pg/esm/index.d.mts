@@ -1,6 +1,7 @@
 import type * as pg from '../dist/index.js'
 
 export {
+  postgres,
   Client,
   Pool,
   QueryExecutor,
@@ -16,6 +17,11 @@ export {
   defaults,
 } from '../dist/index.js'
 export type {
+  Sql,
+  SqlOptions,
+  SqlRows,
+  PendingQuery,
+  TransactionSql,
   ClientConfig,
   ConnectionConfig,
   CustomTypesConfig,
@@ -32,7 +38,6 @@ export type {
   QueryCallback,
   PoolConfig,
   PoolClient,
-  NativeApi,
   Notification,
   FieldDef,
   Submittable,
@@ -44,5 +49,5 @@ export type {
   SslOptions,
 } from '../dist/index.js'
 
-declare const api: typeof pg
+declare const api: typeof pg.postgres & Omit<typeof pg, 'default'>
 export default api

@@ -41,7 +41,7 @@ interface Endpoint {
 interface ConnectionRecord {
   client: Client
   endpoint: Endpoint
-  state: 'connecting' | 'ready' | 'closing'
+  state: 'connecting' | 'ready' | 'reserved' | 'closing'
   tasks: Set<Task>
   openedAt: number
   timer?: NodeJS.Timeout
@@ -51,7 +51,13 @@ interface PreparedQuery {
   timeout: number
   signal?: AbortSignal
 }
+export interface ReservedConnection {
+  query<R extends object = QueryResultRow>(config: IndependentQueryConfig): Promise<Result<R>>
+  release(): void
+}
 interface Task extends PreparedQuery {
+  lease?: (task: Task) => void
+  transaction?: true
   resolve: (result: Result) => void
   reject: (reason: unknown) => void
   state: 'queued' | 'assigned' | 'done'
@@ -328,44 +334,123 @@ class QueryExecutor {
     }
 
     return new Promise<Result<R>>((resolve, reject) => {
-      const task: Task = {
-        ...prepared,
-        resolve: resolve as unknown as (result: Result) => void,
-        reject,
-        state: 'queued',
-        resultRows: 0,
-        resultBytes: 0,
-        deadline: prepared.timeout ? performance.now() + prepared.timeout : 0,
-      }
-      try {
-        if (task.signal !== undefined) {
-          task.abortListener = (events as typeof events & AbortListenerCapability).addAbortListener(task.signal, () =>
-            this._abort(task)
-          )
-          if (task.signal.aborted) {
-            this._abort(task)
-            return
-          }
-        }
-      } catch (cause) {
-        this._settle({
-          task,
-          error: this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Invalid AbortSignal', cause }),
-        })
-        return
-      }
-      if (this._pending.size >= this._maxPending) {
-        this._settle({
-          task,
-          error: this._error({ code: 'PG_EXECUTOR_OVERLOADED', message: 'Executor waiting queue is full' }),
-        })
-        return
-      }
-      if (!this._records.size && !this._pending.size) this._generation++
-      this._pending.set(task, task)
-      if (task.deadline) task.timer = setTimeout(() => this._expire(task), task.timeout)
-      this._pump()
+      this._enqueue({ prepared, resolve: resolve as unknown as Task['resolve'], reject })
     })
+  }
+
+  reserve(): Promise<ReservedConnection> {
+    if (this._state !== 'open')
+      return Promise.reject(this._error({ code: 'PG_EXECUTOR_CLOSED', message: 'Executor is closing' }))
+    return new Promise((resolve, reject) => {
+      this._enqueue({
+        prepared: { config: { text: '', queryMode: 'extended' }, timeout: this._timeout },
+        resolve: () => {},
+        reject,
+        lease: (task) => {
+          resolve({
+            query: (config) => this._reservedQuery({ lease: task, config }),
+            release: () => this._release(task),
+          })
+        },
+      })
+    })
+  }
+
+  private _reservedQuery<R extends object>({
+    lease,
+    config,
+  }: {
+    lease: Task
+    config: IndependentQueryConfig
+  }): Promise<Result<R>> {
+    if (lease.state !== 'assigned' || lease.record!.state !== 'reserved')
+      return Promise.reject(this._error({ code: 'PG_EXECUTOR_CLOSED', message: 'Reserved connection is closed' }))
+    let prepared: PreparedQuery
+    try {
+      prepared = this._toConfig({ input: config, values: undefined, argumentCount: 1 })
+    } catch (cause) {
+      return Promise.reject(cause instanceof QueryExecutorError ? cause : this._invalid('Invalid reserved query'))
+    }
+    return new Promise((resolve, reject) => {
+      this._enqueue({ prepared, resolve: resolve as unknown as Task['resolve'], reject, reservedRecord: lease.record })
+    })
+  }
+
+  private _release(task: Task) {
+    if (task.state === 'done') return
+    const record = task.record!
+    if (record.tasks.size !== 1 || record.client.getTransactionStatus() !== 'I') {
+      this._discard({
+        record,
+        error: this._error({
+          code: 'PG_EXECUTOR_TRANSACTION',
+          message: 'Reserved connection was released before its work finished',
+          outcome: 'unknown',
+        }),
+      })
+      return
+    }
+    record.state = 'ready'
+    this._settle({ task })
+    this._pump()
+  }
+
+  private _enqueue({
+    prepared,
+    resolve,
+    reject,
+    lease,
+    reservedRecord,
+  }: {
+    prepared: PreparedQuery
+    resolve: Task['resolve']
+    reject: Task['reject']
+    lease?: Task['lease']
+    reservedRecord?: ConnectionRecord
+  }) {
+    const task: Task = {
+      ...prepared,
+      transaction: reservedRecord ? true : undefined,
+      resolve,
+      lease,
+      reject,
+      state: 'queued',
+      resultRows: 0,
+      resultBytes: 0,
+      deadline: prepared.timeout ? performance.now() + prepared.timeout : 0,
+    }
+    try {
+      if (task.signal !== undefined) {
+        task.abortListener = (events as typeof events & AbortListenerCapability).addAbortListener(task.signal, () =>
+          this._abort(task)
+        )
+        if (task.signal.aborted) {
+          this._abort(task)
+          return
+        }
+      }
+    } catch (cause) {
+      this._settle({
+        task,
+        error: this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Invalid AbortSignal', cause }),
+      })
+      return
+    }
+    if (reservedRecord ? reservedRecord.tasks.size > this._perConnection : this._pending.size >= this._maxPending) {
+      this._settle({
+        task,
+        error: this._error({ code: 'PG_EXECUTOR_OVERLOADED', message: 'Executor waiting queue is full' }),
+      })
+      return
+    }
+    if (task.deadline) task.timer = setTimeout(() => this._expire(task), task.timeout)
+    if (reservedRecord) {
+      this._dispatch({ task, record: reservedRecord })
+      return
+    }
+    if (!this._records.size && !this._pending.size) this._generation++
+    this._pending.set(task, task)
+    this._pump()
   }
 
   async rows<R extends object = QueryResultRow>(...args: QueryArguments): Promise<R[]> {
@@ -418,7 +503,7 @@ class QueryExecutor {
   }
 
   private _consumeResult({ task, query }: { task: Task; query: BufferedQuery }, message: BackendMessage): boolean {
-    if (task.state !== 'assigned' || task.record!.state !== 'ready') {
+    if (task.state !== 'assigned' || (task.record!.state !== 'ready' && task.record!.state !== 'reserved')) {
       query._discardResult(task.resultError)
       return false
     }
@@ -471,55 +556,65 @@ class QueryExecutor {
     this._pump()
   }
 
+  private _dispatch({ task, record }: { task: Task; record: ConnectionRecord }) {
+    this._pending.delete(task)
+    task.state = 'assigned'
+    task.record = record
+    record.tasks.add(task)
+    this._inFlight++
+    if (task.lease) {
+      clearTimeout(task.timer)
+      record.state = 'reserved'
+      task.lease(task)
+      return
+    }
+    try {
+      record.client.query({
+        ...task.config,
+        query_timeout: 0,
+        [resultBudget]: (query) => {
+          task.resultQuery = query
+          const context = { task, query }
+          return (message) => this._consumeResult(context, message)
+        },
+        callback: (error, result) =>
+          this._complete({ record: record!, task, error, result: result as Result | undefined }),
+      })
+    } catch (cause) {
+      this._discard({
+        record,
+        task,
+        error: this._error({
+          code: 'PG_EXECUTOR_UNKNOWN',
+          message: 'Assigned query failed',
+          outcome: 'unknown',
+          cause,
+        }),
+      })
+    }
+  }
+
   private _pump() {
     if (this._pumping || this._state === 'destroyed') return
     this._pumping = true
     try {
       while (this._pending.size) {
+        const task = this._pending.values().next().value!
         let record: ConnectionRecord | undefined
         for (const candidate of this._records) {
           if (
             candidate.state === 'ready' &&
-            candidate.tasks.size < this._perConnection &&
+            (task.lease ? candidate.tasks.size === 0 : candidate.tasks.size < this._perConnection) &&
             (!record || candidate.tasks.size < record.tasks.size)
           )
             record = candidate
         }
         if (!record) break
-        const task = this._pending.values().next().value!
         if (task.deadline && task.deadline <= performance.now()) {
           this._expire(task)
           continue
         }
-        this._pending.delete(task)
-        task.state = 'assigned'
-        task.record = record
-        record.tasks.add(task)
-        this._inFlight++
-        try {
-          record.client.query({
-            ...task.config,
-            query_timeout: 0,
-            [resultBudget]: (query) => {
-              task.resultQuery = query
-              const context = { task, query }
-              return (message) => this._consumeResult(context, message)
-            },
-            callback: (error, result) =>
-              this._complete({ record: record!, task, error, result: result as Result | undefined }),
-          })
-        } catch (cause) {
-          this._discard({
-            record,
-            task,
-            error: this._error({
-              code: 'PG_EXECUTOR_UNKNOWN',
-              message: 'Assigned query failed',
-              outcome: 'unknown',
-              cause,
-            }),
-          })
-        }
+        this._dispatch({ task, record })
       }
       let projected = 0
       for (const record of this._records) {
@@ -532,7 +627,7 @@ class QueryExecutor {
       }
       let healthy = false
       for (const record of this._records) {
-        if (record.state === 'connecting' || record.state === 'ready') healthy = true
+        if (record.state !== 'closing') healthy = true
       }
       if (this._pending.size && !healthy) {
         const retryAt = Math.min(...this._endpoints.map((endpoint) => endpoint.retryAt))
@@ -692,7 +787,7 @@ class QueryExecutor {
       })
       return
     }
-    if (!error && record.client.getTransactionStatus() !== 'I') {
+    if (!error && !task.transaction && record.client.getTransactionStatus() !== 'I') {
       this._discard({
         record,
         task,

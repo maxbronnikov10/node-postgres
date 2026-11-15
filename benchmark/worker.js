@@ -26,8 +26,6 @@ for (const name of ['pg-protocol', 'pg-pool']) {
   )
 }
 const pg = require(path.join(root, 'packages/pg'))
-const Cursor = require(path.join(root, 'packages/pg-cursor'))
-const QueryStream = require(path.join(root, 'packages/pg-query-stream'))
 
 const BATCH = 10
 const ROWS = 500
@@ -197,22 +195,6 @@ const scenarios = ({ client, pipelined, prepared, batched, automatic, pool, cont
       return 3
     },
     'pool query, select 1 row': async () => consume((await pool.query(select(1))).rows),
-    'cursor, 500 rows in 5 reads': async () => {
-      const cursor = client.query(new Cursor(select(ROWS).text))
-      let rows
-      do {
-        rows = await cursor.read(100)
-        consume(rows)
-      } while (rows.length > 0)
-      await cursor.close()
-      return 1
-    },
-    'query stream, 500 rows': async () => {
-      const rows = []
-      for await (const row of client.query(new QueryStream(select(ROWS).text))) rows.push(row)
-      consume(rows)
-      return 1
-    },
     [`select 100 rows, all types, pipelined x${BATCH}`]: async () => {
       const batch = await Promise.all(Array.from({ length: BATCH }, () => pipelined.query(select(100))))
       for (const res of batch) consume(res.rows)
@@ -330,7 +312,13 @@ const regression = async () => {
 const main = async () => {
   const profile = process.env.PG_BENCH_PROFILE || 'regression'
   let workload
-  if (profile === 'queue') {
+  if (profile === 'postgresjs') {
+    workload = await require('./postgresjs').createPostgresJsWorkload({
+      pg,
+      root,
+      arm: Number(process.env.PG_BENCH_ARM),
+    })
+  } else if (profile === 'queue') {
     const Pool = require(path.join(root, 'packages/pg-pool'))
     const { scenarios: all, pools } = createQueueScenarios(Pool)
     workload = { all, pools, clients: [] }
@@ -358,6 +346,9 @@ const main = async () => {
         if (workload.setup) await workload.setup()
         else if (profile === 'regression') await setup(clients[0])
         process.send({ ok: true })
+      } else if (msg.type === 'prepare') {
+        if (workload.prepare) await workload.prepare()
+        process.send({ ok: true })
       } else if (msg.type === 'run') {
         process.send({ ok: true, qps: await measure(all[msg.scenario], msg.ms) })
       } else if (msg.type === 'end') {
@@ -368,7 +359,7 @@ const main = async () => {
       process.send({ ok: false, error: String(err.stack || err) })
     }
   })
-  process.send({ ok: true, scenarios: Object.keys(all) })
+  process.send({ ok: true, scenarios: Object.keys(all), metadata: workload.metadata || null })
 }
 
 main().catch((err) => {

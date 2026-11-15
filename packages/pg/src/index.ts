@@ -6,7 +6,7 @@ import ResultClass = require('./result')
 import utilsValue = require('./utils')
 import PoolClass = require('pg-pool')
 import TypeOverridesClass = require('./type-overrides')
-import type NativeClient = require('./native')
+import postgresFactory from './sql'
 import type { ClientConfig, TypeParserRegistry } from './types'
 import { QueryExecutor as QueryExecutorClass, QueryExecutorError as QueryExecutorErrorClass } from './query-executor'
 
@@ -68,16 +68,7 @@ class PG {
   }
 }
 
-let clientConstructor = ClientClass
-let forceNative = false
-try {
-  forceNative = !!process.env.NODE_PG_FORCE_NATIVE
-} catch {
-  // Deno can deny environment access.
-}
-if (forceNative) clientConstructor = require('./native') as typeof ClientClass
-
-const api = new PG(clientConstructor)
+const api = new PG(ClientClass)
 
 export const defaults: typeof defaultsValue = api.defaults
 export const Client = api.Client
@@ -106,41 +97,9 @@ export type Result<R extends object = import('./types').QueryResultRow> = Result
 export const utils = api.utils
 export type * from './types'
 
-export type NativeApi = Omit<PG, 'Client' | 'Query' | 'Pool' | 'QueryExecutor' | 'QueryExecutorError'> & {
-  Client: typeof NativeClient
-  Query: typeof NativeClient.Query
-  Pool: new (options?: NativePoolConfig) => NativePool
-}
-export type NativePoolClient = NativeClient & { release: PoolClass.Release }
-export type NativePoolConfig = Omit<
-  PoolClass.PoolConfig,
-  keyof import('./native/binding').NativeClientConfig | 'Client' | 'verify' | 'onConnect'
-> &
-  import('./native/binding').NativeClientConfig & {
-    Client?: typeof NativeClient
-    verify?: (client: NativeClient, callback: PoolClass.EndCallback) => void
-    onConnect?: (client: NativeClient) => void | PromiseLike<void>
-  }
-export interface NativePool extends Omit<PoolClass, 'Client' | 'connect' | 'query'> {
-  Client: typeof NativeClient
-  query: NativeClient['query']
-  connect(): Promise<NativePoolClient>
-  connect(callback: (error: Error | null, client: NativePoolClient, release: PoolClass.Release) => void): void
-}
-export declare const native: NativeApi | null
-
-module.exports = api
-Object.defineProperty(api, 'native', {
-  configurable: true,
-  enumerable: false,
-  get() {
-    let native: NativeApi | null = null
-    try {
-      native = new PG(require('./native') as typeof ClientClass) as unknown as NativeApi
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'MODULE_NOT_FOUND') throw error
-    }
-    Object.defineProperty(api, 'native', { value: native })
-    return native
-  },
-})
+export const postgres = postgresFactory
+export type { Sql, SqlOptions, SqlRows, PendingQuery, TransactionSql } from './sql'
+const sqlApi = Object.assign(postgresFactory, api, { postgres: postgresFactory })
+export default sqlApi
+Object.defineProperty(sqlApi, 'default', { value: sqlApi })
+module.exports = sqlApi

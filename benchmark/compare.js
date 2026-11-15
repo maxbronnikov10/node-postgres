@@ -138,6 +138,13 @@ const markdown = ({ labels, rows, rounds, duration, profile }) => {
     lines.push(
       'Same candidate checkout. Base/base2: default int4 text parser. Head/head2: opt-in types override, text OID 23 -> Number; binary and every other OID delegate to pg.types.getTypeParser. All arms: QueryExecutor max 4, depth 16, maxPending 1024, maxAutoPrepare 16, identical result budgets, four warmed frontends, object rows and 16 concurrent queries. Only the 500-row SELECT with two int4 columns runs; identical SQL and named preparation, every field of every row checked. This measures canonical PostgreSQL int4 text in a bulk workload; it does not imply a general parsing improvement or a change to int8/numeric.'
     )
+  } else if (profile === 'postgresjs') {
+    lines.push(
+      'Same checkout. Base/base2 use pinned Postgres.js; head/head2 use pg.postgres. All actors use four warmed connections, max pipeline 16, prepared statements, identical tagged SQL and checked object/array result shapes.'
+    )
+    if (process.env.PG_BENCH_TLS_CA) lines.push('Verified TLS 1.3 using the same CA and TLS settings on all actors.')
+    if (process.env.PG_BENCH_DELAY_MS !== undefined)
+      lines.push(`Opaque TCP relay adds ${process.env.PG_BENCH_DELAY_MS} ms per direction to both actors.`)
   } else if (profile === 'executor-regression') {
     lines.push(
       'Before/after QueryExecutor on both arms: max 4, depth 16, maxPending 1024, maxAutoPrepare 16, target any. Four warmed frontends, checked results, no BEGIN. Actors run sequentially and update identical fixed keys.'
@@ -151,16 +158,19 @@ const markdown = ({ labels, rows, rounds, duration, profile }) => {
       'Same checkout. Base: pipeline false. Head: pipeline true. Both use maxAutoPrepare 16; no BEGIN. One client, concurrency: 16.'
     )
   }
+  if (profile === 'postgresjs')
+    lines.push('Controls above 10% make a row inconclusive even when every ratio is faster or slower.')
   lines.push('')
   lines.push(`| Scenario | Base ${unit} | Head ${unit} | Head / base | Rounds | Noise |`)
   lines.push('| --- | ---: | ---: | ---: | ---: | ---: |')
   for (const row of rows) {
-    const mark = row.notable ? (row.speedup < 1 ? ' :eyes:' : ' :trophy:') : ''
-    const change = row.notable ? `**${percent(row.speedup)}**` : percent(row.speedup)
+    const valid = profile !== 'postgresjs' || row.noise <= 0.1
+    const mark = row.notable && valid ? (row.speedup < 1 ? ' :eyes:' : ' :trophy:') : ''
+    const change = row.notable && valid ? `**${percent(row.speedup)}**` : percent(row.speedup)
     lines.push(
       `| ${row.name}${mark} | ${row.base.toFixed(0)} | ${row.head.toFixed(0)} | ` +
         `${row.speedup.toFixed(3)}x (${change}) | ${row.min.toFixed(2)} to ${row.max.toFixed(2)} | ` +
-        `±${(row.noise * 100).toFixed(1)}% |`
+        `±${(row.noise * 100).toFixed(1)}%${valid ? '' : ' (inconclusive)'} |`
     )
   }
   lines.push('')
@@ -182,7 +192,7 @@ const main = async () => {
   const args = parseArgs(process.argv.slice(2))
   if (!args.base || !args.head) {
     throw new Error(
-      'usage: node benchmark/compare.js --base <dir> --head <dir> [--rounds 4] [--duration 3] [--output file] [--json-output file] [--scenario label] [--profile regression|ablation|queue|payload|autocommit|autocommit-prepare|autocommit-pipeline|tls-handshake|tls-steady|rows|row-formats|executor|executor-regression|executor-row-mode|executor-int-parser]'
+      'usage: node benchmark/compare.js --base <dir> --head <dir> [--rounds 4] [--duration 3] [--output file] [--json-output file] [--scenario label] [--profile regression|ablation|queue|payload|autocommit|autocommit-prepare|autocommit-pipeline|tls-handshake|tls-steady|rows|row-formats|executor|executor-regression|executor-row-mode|executor-int-parser|postgresjs]'
     )
   }
   const rounds = Number(args.rounds || 4)
@@ -206,6 +216,7 @@ const main = async () => {
       'executor-regression',
       'executor-row-mode',
       'executor-int-parser',
+      'postgresjs',
     ].includes(profile)
   ) {
     throw new Error(`unknown profile: ${profile}`)
@@ -223,6 +234,7 @@ const main = async () => {
       'executor',
       'executor-row-mode',
       'executor-int-parser',
+      'postgresjs',
     ].includes(profile) &&
     fs.realpathSync(args.base) !== fs.realpathSync(args.head)
   ) {
@@ -249,6 +261,7 @@ const main = async () => {
       throw new Error(`unknown scenario: ${args.scenario}; available: ${scenarios.join('; ')}`)
     }
     await arms.base.send({ type: 'setup' })
+    if (profile === 'postgresjs') await Promise.all(names.map((name) => arms[name].send({ type: 'prepare' })))
 
     const ratio = (qps, over, under) => qps[over].map((value, i) => value / qps[under][i])
     const rows = []
@@ -309,6 +322,19 @@ const main = async () => {
           {
             schemaVersion: 1,
             profile,
+            ...(profile === 'postgresjs'
+              ? {
+                  comparison: {
+                    arms: { base: 'Postgres.js', base2: 'Postgres.js', head: 'pg.postgres', head2: 'pg.postgres' },
+                    connections: 4,
+                    maxPipeline: 16,
+                    prepare: true,
+                    controlQualityLimit: 0.1,
+                    resultFormats: ['object', 'values'],
+                  },
+                  actorMetadata: Object.fromEntries(names.map((name, i) => [name, ready[i].metadata || null])),
+                }
+              : {}),
             ...(profile === 'executor-row-mode'
               ? {
                   comparison: {

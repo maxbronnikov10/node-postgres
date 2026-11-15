@@ -24,13 +24,13 @@ import type {
   QueryResultRow,
   QueryResult,
   QueryResults,
-  SocketStream,
   SslOptions,
   Submittable,
   TextParser,
   BinaryParser,
   TypeFormat,
   Notification,
+  ValueParser,
 } from './types'
 import type {
   AuthenticationMD5Password,
@@ -116,6 +116,9 @@ class Client extends EventEmitter {
   _maxAutoPrepare: number
   _autoPreparedStatements: Map<string, string> | undefined
   _autoPreparePrefix: string | undefined
+  private _autoPreparedDescriptions:
+    | Map<string, { message: RowDescriptionMessage; expiresAt: number; parser: ValueParser }>
+    | undefined
   binary: boolean | undefined
   processID: number | null
   secretKey: number | null
@@ -125,7 +128,7 @@ class Client extends EventEmitter {
   connectionTimeoutHandle: NodeJS.Timeout | undefined
   _connectionCallback: ConnectCallback | null | undefined
   _pipelineDrainListener: (() => void) | null | undefined
-  _tlsWritePending: (() => void) | null | undefined
+  _pipelineWritePending: (() => void) | null | undefined
   _batchScheduled: boolean | undefined
   readyForQuery: boolean | undefined
   hasExecuted: boolean | undefined
@@ -196,6 +199,7 @@ class Client extends EventEmitter {
     }
     if (this._maxAutoPrepare) {
       this._autoPreparedStatements = new Map()
+      this._autoPreparedDescriptions = new Map()
       this._autoPreparePrefix = 'pg_auto_' + crypto.randomBytes(12).toString('hex') + '_'
     }
     this.binary = c.binary || defaults.binary
@@ -559,12 +563,41 @@ class Client extends EventEmitter {
     }
     // delegate rowDescription to active query
     activeQuery.handleRowDescription(msg)
+    const query = activeQuery as Query
+    if (
+      (query.constructor as Function) === Query &&
+      query._result?.prefersRawInt4 &&
+      msg.fields.length <= 32 &&
+      query.text &&
+      query.name &&
+      !query.types &&
+      !query.portal &&
+      this._autoPreparedStatements?.get(query.text) === query.name
+    ) {
+      const descriptions = this._autoPreparedDescriptions!
+      if (!descriptions.has(query.name) && descriptions.size >= this._maxAutoPrepare) {
+        descriptions.delete(descriptions.keys().next().value!)
+      }
+      descriptions.set(query.name, {
+        message: this._copyRowDescription(msg),
+        expiresAt: Date.now() + 300000,
+        parser: query._result._parsers![0],
+      })
+    }
     this.connection.setDataRowMode?.(
       activeQuery.constructor === Query &&
+        !(activeQuery as Query)._result?.prefersRawInt4 &&
         msg.fields.every((field: { readonly format: TypeFormat }) => field.format === 'text')
         ? 'text'
         : 'raw'
     )
+  }
+
+  private _copyRowDescription(message: RowDescriptionMessage): RowDescriptionMessage {
+    return {
+      ...message,
+      fields: message.fields.map((field) => Object.assign(Object.create(Object.getPrototypeOf(field)), field)),
+    }
   }
 
   _handleDataRow(msg: DataRowMessage | RawDataRowMessage) {
@@ -795,19 +828,18 @@ class Client extends EventEmitter {
     if (
       this._queryQueue.length &&
       !this._pipelineDrainListener &&
-      !this._tlsWritePending &&
-      (stream as SocketStream & { encrypted?: boolean }).encrypted === true &&
+      !this._pipelineWritePending &&
       typeof stream.cork === 'function' &&
       typeof stream.uncork === 'function'
     ) {
-      // A TLS record can carry several queries while each keeps its own Sync boundary.
+      // One socket write can carry several queries while each keeps its own Sync boundary.
       stream.cork()
       const flush = () => {
-        if (this._tlsWritePending !== flush) return
-        this._tlsWritePending = null
+        if (this._pipelineWritePending !== flush) return
+        this._pipelineWritePending = null
         stream.uncork()
       }
-      this._tlsWritePending = flush
+      this._pipelineWritePending = flush
       process.nextTick(flush)
     }
     while (!this._pipelineDrainListener && this._queryQueue.length > 0) {
@@ -822,7 +854,7 @@ class Client extends EventEmitter {
       }
       this._sentQueryQueue.push(query)
       // A full buffer should start draining immediately rather than wait for the batching tick.
-      if (stream.writableNeedDrain && this._tlsWritePending) this._tlsWritePending()
+      if (stream.writableNeedDrain && this._pipelineWritePending) this._pipelineWritePending()
       if (query instanceof Batch) break
       if (this.connection.stream.writableNeedDrain) {
         this._pipelineDrainListener = () => {
@@ -934,6 +966,14 @@ class Client extends EventEmitter {
           this._autoPreparedStatements!.set(query.text, name)
         }
         query.name = name
+        if (name && !query.binary && !this.binary) {
+          const cached = this._autoPreparedDescriptions!.get(name)
+          if (cached && cached.expiresAt > Date.now() && this._types.getTypeParser(23, 'text') === cached.parser) {
+            ;(query as Query)._cachedRowDescription = this._copyRowDescription(cached.message)
+          } else if (cached) {
+            this._autoPreparedDescriptions!.delete(name)
+          }
+        }
       }
       if (!query.callback) {
         result = new this._Promise<QueryResults>((resolve, reject) => {

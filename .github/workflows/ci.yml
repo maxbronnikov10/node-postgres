@@ -56,9 +56,7 @@ jobs:
       matrix:
         include:
           # Historical Node.js versions tested against a single PostgreSQL version
-          - { node: '16', postgres: &stable_postgres '18' }
-          - { node: '18', postgres: *stable_postgres }
-          - { node: '20', postgres: *stable_postgres }
+          - { node: '20', postgres: &stable_postgres '18' }
           - { node: '22', postgres: *stable_postgres }
           - { node: '24', postgres: *stable_postgres }
           # Latest Node.js version tested against multiple PostgreSQL versions

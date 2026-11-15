@@ -23,10 +23,6 @@ async function checkConsumer() {
       for (const dependency of Object.keys(installed[section] || {})) {
         if (!manifest.packages[dependency]) continue
         assert.equal(installed[section][dependency], manifest.packages[dependency].version)
-        if (dependency === 'pg-native') {
-          assert.equal(installed.peerDependenciesMeta[dependency].optional, true)
-          continue
-        }
         const entry = localRequire.resolve(dependency)
         assert.ok(
           entry.startsWith(directory + path.sep) || entry.startsWith(path.join(__dirname, 'node_modules') + path.sep)
@@ -49,8 +45,8 @@ async function checkConsumer() {
   }
   assert.equal(fs.existsSync(path.join(__dirname, 'node_modules', 'pg-native')), false)
   const pg = require('pg')
-  const Cursor = require('pg-cursor')
-  const QueryStream = require('pg-query-stream')
+  assert.throws(() => require('pg/lib/native'), { code: 'MODULE_NOT_FOUND' })
+  assert.equal(Object.prototype.hasOwnProperty.call(pg, 'native'), false)
   const options = { connectionTimeoutMillis: 5000, query_timeout: 10000 }
   const executor = new pg.QueryExecutor({ ...options, max: 1, maxResultRows: 2 })
   const client = new pg.Client(options)
@@ -68,23 +64,16 @@ async function checkConsumer() {
       (await client.query({ text: 'SELECT $1::int4 AS value', values: [-16909061], binary: true })).rows,
       [{ value: -16909061 }]
     )
-    const cursor = client.query(new Cursor('SELECT generate_series(1, 3) AS value'))
+    const sql = pg.postgres(options)
     try {
-      assert.deepEqual(await cursor.read(2), [{ value: 1 }, { value: 2 }])
-      assert.deepEqual(await cursor.read(2), [{ value: 3 }])
-      assert.deepEqual(await cursor.read(2), [])
+      assert.deepEqual(await sql`SELECT ${42}::int AS value`, [{ value: 42 }])
+      assert.deepEqual(await sql`SELECT ${42}::int AS value`.values(), [[42]])
+      assert.deepEqual(await sql.begin((tx) => tx`SELECT ${42}::int AS value`), [{ value: 42 }])
     } finally {
-      await cursor.close()
+      await sql.end()
     }
-    const rows = []
-    for await (const row of client.query(
-      new QueryStream('SELECT generate_series(1, 3) AS value', [], { batchSize: 2 })
-    )) {
-      rows.push(row)
-    }
-    assert.deepEqual(rows, [{ value: 1 }, { value: 2 }, { value: 3 }])
     console.log(
-      'PASS: isolated versions, no source links, CJS/ESM, executor recovery, binary int4, cursor, query-stream'
+      'PASS: isolated versions, no source links, CJS/ESM, executor recovery, binary int4, tagged SQL and transaction'
     )
   } finally {
     await Promise.allSettled([executor.end(), client.end()])
@@ -105,17 +94,9 @@ class PackageChecker {
     const consumer = path.resolve(process.argv[3])
     assert.equal(fs.existsSync(consumer), false, 'Consumer directory must not exist')
     const manifest = JSON.parse(fs.readFileSync(path.join(artifacts, 'manifest.json'), 'utf8'))
-    const names = [
-      'pg',
-      'pg-protocol',
-      'pg-pool',
-      'pg-cursor',
-      'pg-query-stream',
-      'pg-connection-string',
-      'pg-cloudflare',
-    ]
+    const names = ['pg', 'pg-protocol', 'pg-pool', 'pg-connection-string']
     assert.deepEqual(manifest.defaultInstall, names)
-    assert.deepEqual(Object.keys(manifest.packages), [...names, 'pg-native'])
+    assert.deepEqual(Object.keys(manifest.packages), names)
     for (const record of Object.values(manifest.packages)) {
       assert.equal(path.basename(record.filename), record.filename)
       assert.match(record.filename, /^[a-z0-9.-]+\.tgz$/)

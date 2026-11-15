@@ -6,7 +6,7 @@ params := $(connectionString)
 
 node-command := xargs -n 1 -I file node file $(params)
 
-.PHONY : test test-integration bench test-native \
+.PHONY : test test-integration bench \
 	 publish update-npm
 
 all:
@@ -17,7 +17,7 @@ help:
 
 test: test-unit
 
-test-all: test-unit test-integration test-native test-worker
+test-all: test-unit test-integration
 
 
 update-npm:
@@ -30,15 +30,6 @@ test-unit:
 	@chmod 600 test/unit/client/pgpass.file
 	@find test/unit -name "*-tests.js" | $(node-command)
 
-test-native:
-	@echo "***Testing native bindings***"
-ifeq ($(TEST_SKIP_NATIVE), true)
-	@echo "***Skipping tests***"
-else
-	@find test/native -name "*-tests.js" | $(node-command)
-	@find test/integration -name "*-tests.js" | $(node-command) native
-endif
-
 test-integration:
 	@echo "***Testing Pure Javascript***"
 	@find test/integration -name "*-tests.js" | $(node-command)
@@ -49,13 +40,3 @@ test-binary:
 
 test-pool:
 	@find test/integration/connection-pool -name "*.js" | $(node-command) binary
-
-test-worker:
-  # this command only runs in node 18.x and above since there are 
-	# worker specific items missing from the node environment in lower versions
-	@if [[ $(shell node --version | sed 's/v//' | cut -d'.' -f1) -ge 18 ]]; then \
-		echo "***Testing Cloudflare Worker support***"; \
-		yarn vitest run -c test/vitest.config.mts test/cloudflare/ --no-watch -- $(params); \
-	else \
-		echo "Skipping test-worker: Node.js version is less than 18."; \
-	fi

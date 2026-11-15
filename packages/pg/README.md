@@ -1,127 +1,96 @@
-# node-postgres
+# Typed SQL
 
-[![Build Status](https://secure.travis-ci.org/brianc/node-postgres.svg?branch=master)](http://travis-ci.org/brianc/node-postgres)
-<span class="badge-npmversion"><a href="https://npmjs.org/package/pg" title="View this project on NPM"><img src="https://img.shields.io/npm/v/pg.svg" alt="NPM version" /></a></span>
-<span class="badge-npmdownloads"><a href="https://npmjs.org/package/pg" title="View this project on NPM"><img src="https://img.shields.io/npm/dm/pg.svg" alt="NPM downloads" /></a></span>
-
-Non-blocking PostgreSQL client for Node.js. Pure JavaScript and optional native libpq bindings.
-
-## Install
-
-```sh
-$ npm install pg
-```
-
-### TypeScript in this fork
-
-These experimental APIs come from this fork or its coordinated package archives;
-the npm registry release is unchanged. The `pg` and `pg-pool` runtimes use strict
-TypeScript and ship declarations for CommonJS and ESM. Build the source checkout with `yarn build` before running it;
-package archives contain the compiled runtime.
-
-For concurrent independent statements, `QueryExecutor` provides bounded queues,
-deadlines and typed row helpers:
+Компактный API по образцу Postgres.js, на TypeScript-ядре node-postgres.
+Node.js 20.5+. Экспериментальная ветка: нового API в npm пока нет.
+Совместимость со всеми возможностями Postgres.js не заявлена.
 
 ```ts
-import { QueryExecutor } from 'pg'
+import postgres from 'pg'
 
 interface User {
   id: number
   name: string
 }
-const db = new QueryExecutor({ connectionString: process.env.DATABASE_URL })
+const sql = postgres(process.env.DATABASE_URL, { max: 4 })
 try {
-  const user = await db.maybeOne<User>('SELECT id, name FROM users WHERE id = $1', [42])
-  console.log({ found: user !== null })
+  const users = await sql<User>`SELECT id, name FROM users WHERE active = ${true}`
+  const user = await sql<User>`SELECT id, name FROM users WHERE id = ${42}`.maybeOne()
+  const one = await sql<User>`SELECT id, name FROM users WHERE id = ${42}`.one()
+  const tuples = await sql`SELECT id, name FROM users`.values<[number, string]>()
 } finally {
-  await db.end()
+  await sql.end()
 }
 ```
 
-`rows()` returns all rows, `one()` requires exactly one, and `maybeOne()` returns
-one or `null`. A cardinality error happens after execution and never retries SQL.
-Use an exclusively checked-out Pool client for transactions and session state.
-See the [API and limits](../../docs/pages/apis/query-executor.mdx).
+CommonJS: `const postgres = require('pg')`; в TypeScript CJS также доступен
+`import { postgres } from 'pg'`. Generic задаёт ожидаемый тип результата;
+проверку фактической схемы PostgreSQL при исполнении он не заменяет.
 
----
+## Параметры и динамический SQL
 
-## :star: [Documentation](https://node-postgres.com) :star:
+`${value}` становится параметром `$1`, а не текстом SQL. Кавычки вокруг
+интерполяции не нужны. `sql('public.users')` обозначает идентификатор,
+`sql.identifier('schema.with.dot', 'users')` экранирует части буквально.
+Вложенные SQL-фрагменты получают правильные номера параметров.
 
-### Features
+```ts
+const filter = sql`AND age >= ${18}`
+const rows = await sql`SELECT id FROM ${sql('public.users')} WHERE active = ${true} ${filter}`
+const existingSql = await sql.unsafe('SELECT id FROM users WHERE id = $1', [42])
+```
 
-- [Fastest PostgreSQL client for Node.js](https://github.com/nigrosimone/postgres-benchmarks)
-- Pure JavaScript client and native libpq bindings share _the same API_
-- Connection pooling
-- Extensible JS ↔ PostgreSQL data-type coercion
-- Supported PostgreSQL features
-  - Parameterized queries
-  - Named statements with query plan caching
-  - Async notifications with `LISTEN/NOTIFY`
-  - Bulk import & export with `COPY TO/COPY FROM`
+`unsafe` принимает доверенный SQL-текст: значения передавайте отдельным массивом.
+Параметризованный `unsafe` нельзя вкладывать во фрагменты.
 
-### Extras
+Запрос ленивый: выполнение начинается при `await`, `.then()` или `.execute()`.
+Повторное ожидание того же объекта возвращает тот же результат без повторного SQL.
+`.values()` выбирается до начала выполнения. Результат — массив с
+неперечисляемыми `count`, `command`, `columns`; `map` и JSON работают привычно.
+`one()` требует одну строку, `maybeOne()` допускает ноль или одну. Ошибка количества
+строк возникает после SQL: запись могла уже зафиксироваться.
 
-node-postgres is by design pretty light on abstractions. These are some handy modules we've been using over the years to complete the picture.
-The entire list can be found on our [wiki](https://github.com/brianc/node-postgres/wiki/Extras).
+## Транзакции
 
-## Support
+```ts
+await sql.begin(async (tx) => {
+  await tx`INSERT INTO jobs (id, done) VALUES (${42}, ${false})`
+  await tx`UPDATE jobs SET done = ${true} WHERE id = ${42}`
+})
+```
 
-node-postgres is free software. If you encounter a bug with the library please open an issue on the [GitHub repo](https://github.com/brianc/node-postgres). If you have questions unanswered by the documentation please open an issue pointing out how the documentation was unclear & I will do my best to make it better!
+`begin` резервирует соединение из общего лимита `max`. Другие запросы не попадают
+внутрь транзакции. Успешный callback приводит к COMMIT, ошибка — к ROLLBACK.
+Перехват ошибки SQL в callback не превращает откатившуюся транзакцию в успешную.
+Объект `tx` действует только внутри callback. Вложенные транзакции/savepoints,
+session state вне `begin`, LISTEN, COPY и streaming этот API не предоставляет.
 
-When you open an issue please provide:
+Лимиты результата и timeout действуют также внутри транзакции. При обрыве
+транспорта во время COMMIT исход неизвестен: автоматического replay нет.
+`end()` ждёт уже запущенные запросы и активные транзакции; неотправленные
+ленивые запросы после закрытия не выполняются.
 
-- version of Node
-- version of Postgres
-- smallest possible snippet of code to reproduce the problem
+## Настройки
 
-You can also follow me [@brianc](https://bsky.app/profile/brianc.bsky.social) on bluesky if that's your thing for updates on node-postgres with nearly zero non node-postgres content. My old twitter/x account is no longer used.
+`postgres(url?, options?)` либо `postgres(options)`; соединение берёт настройки
+также из обычных PG environment variables. `username` — синоним `user`.
 
-## Sponsorship :two_hearts:
+| Настройка        | По умолчанию | Назначение                                  |
+| ---------------- | -----------: | ------------------------------------------- |
+| `max`            |            4 | Общий предел соединений, включая транзакции |
+| `max_pipeline`   |           16 | Независимых запросов на соединение          |
+| `prepare`        |         true | Автоматические prepared statements          |
+| `maxAutoPrepare` |          256 | Предел подготовленных SQL на соединение     |
+| `maxPending`     |         1024 | Предел ожидающих запросов                   |
+| `query_timeout`  |        30000 | Deadline в миллисекундах; 0 отключает       |
+| `maxResultRows`  |       100000 | Общий бюджет буферизуемых строк             |
+| `maxResultBytes` |     67108864 | Общий бюджет протокольных байтов результата |
 
-node-postgres's continued development has been made possible in part by generous financial support from [the community](https://github.com/brianc/node-postgres/blob/master/SPONSORS.md).
+`ssl`, `sslnegotiation`, `endpoints`, `targetSessionAttrs` и пользовательские
+`types` используют [контракт ядра](../../docs/pages/apis/query-executor.mdx).
+Для PgBouncer transaction mode подготовка требует tracking prepared statements
+на стороне pooler; иначе укажите `prepare: false`.
+`int8` и `numeric` остаются строками без потери точности.
+Client/Pool доступны для миграции и продвинутых сценариев; native удалён.
 
-If you or your company are benefiting from node-postgres and would like to help keep the project financially sustainable [please consider supporting](https://github.com/sponsors/brianc) its development.
-
-### Featured sponsor
-
-Special thanks to [medplum](https://medplum.com) for their generous and thoughtful support of node-postgres!
-
-![medplum](https://raw.githubusercontent.com/medplum/medplum-logo/refs/heads/main/medplum-logo.png)
-
-## Contributing
-
-**:heart: contributions!**
-
-I will **happily** accept your pull request if it:
-
-- **has tests**
-- looks reasonable
-- does not break backwards compatibility
-
-If your change involves breaking backwards compatibility please please point that out in the pull request & we can discuss & plan when and how to release it and what type of documentation or communication it will require.
-
-## Troubleshooting and FAQ
-
-The causes and solutions to common errors can be found among the [Frequently Asked Questions (FAQ)](https://github.com/brianc/node-postgres/wiki/FAQ)
-
-## License
-
-Copyright (c) 2010-2020 Brian Carlson (brian.m.carlson@gmail.com)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+Бенчмарк сравнивает Postgres.js 4.1.1 и этот API на одинаковых запросах,
+соединениях, pipeline depth и форматах результата. Исходные замеры сохраняются.

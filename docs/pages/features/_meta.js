@@ -6,7 +6,6 @@ export default {
   transactions: 'Transactions',
   types: 'Data Types',
   ssl: 'SSL',
-  native: 'Native',
   esm: 'ESM',
   callbacks: 'Callbacks',
 }
