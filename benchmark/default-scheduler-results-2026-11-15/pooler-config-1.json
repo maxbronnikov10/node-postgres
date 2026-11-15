@@ -1,0 +1,1 @@
+{"sourceCommit":"5d49e9bde021b33656546f468a591d7813207062","verified":{"pool_mode":"transaction","max_prepared_statements":"0","default_pool_size":"4","client_tls_sslmode":"require","client_tls_protocols":"tlsv1.3","server_tls_sslmode":"verify-full","server_tls_protocols":"tlsv1.3"},"frontendTls":"TLSv1.3"}

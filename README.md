@@ -42,8 +42,10 @@ try {
 Node.js 20.5+. Без native bindings, Cloudflare, отдельного cursor и query-stream.
 MIT; исходная реализация и авторство node-postgres сохранены.
 
-[Результаты сравнения с Postgres.js](benchmark/sql-results-2026-11-15.md):
-PgBouncer unprepared и bytea имеют подтверждённые выигрыши; обычные prepared SELECT пока медленнее.
+[Новые результаты сравнения с Postgres.js](benchmark/default-scheduler-results-2026-11-15.md):
+короткие параллельные SELECT с настройками по умолчанию получили подтверждённый выигрыш.
+Равные лимиты, другие запросы, PgBouncer, шум и исходные данные показаны отдельно.
+[Предыдущие результаты](benchmark/sql-results-2026-11-15.md) сохранены.
 
 [Нагрузочные проверки и оптимизация компилятора](benchmark/production-results-2026-11-15.md):
 смешанный поток, p95/p99, память, переполнение очередей и контроль Postgres.js с явными типами параметров.
