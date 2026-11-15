@@ -3,7 +3,7 @@ name: SQL unprepared comparison
 on:
   workflow_dispatch:
   push:
-    branches: [perf/sql-unprepared-benchmark]
+    branches: [perf/sql-unprepared-benchmark, perf/sql-default-throughput]
     paths:
       - 'packages/pg/src/**'
       - 'packages/pg-protocol/src/**'
@@ -12,6 +12,7 @@ on:
       - 'benchmark/unprepared/**'
       - '**/package.json'
       - 'yarn.lock'
+      - '.github/workflows/benchmark-unprepared.yml'
 
 permissions:
   contents: read
