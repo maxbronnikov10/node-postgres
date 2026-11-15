@@ -24,17 +24,9 @@ const supportsUtf8Slice = typeof (Buffer.prototype as Buffer & { utf8Slice?: unk
 type RawInt4Reader = (this: Result<object>, buffer: Buffer, offset: number) => object
 type TextRowReader = (this: Result<object>, rowData: readonly (string | Buffer | null)[]) => object
 type ReaderOptions = { names: readonly string[]; rowAsArray: boolean }
-type CachedRawTextReader = {
-  factory: (originalBool: ValueParser | undefined, ...parsers: ValueParser[]) => RawInt4Reader
-  variants: { parsers: ValueParser[]; reader: RawInt4Reader }[]
-  expiresAt: number
-}
 
 class RowReaderCache {
-  private readonly readers = new Map<
-    string,
-    { reader: RawInt4Reader | TextRowReader; expiresAt: number } | CachedRawTextReader
-  >()
+  private readonly readers = new Map<string, { reader: RawInt4Reader | TextRowReader; expiresAt: number }>()
   private disabled = false
 
   get(options: ReaderOptions & { mode: 'int4' }): RawInt4Reader | undefined
@@ -45,7 +37,6 @@ class RowReaderCache {
       int4: readonly boolean[]
       int8: readonly boolean[]
       bool: readonly boolean[]
-      parsers: readonly ValueParser[]
     }
   ): RawInt4Reader | undefined
   get({
@@ -55,21 +46,17 @@ class RowReaderCache {
     int4,
     int8,
     bool,
-    parsers,
   }: ReaderOptions & {
     mode: 'int4' | 'text' | 'raw-text'
     int4?: readonly boolean[]
     int8?: readonly boolean[]
     bool?: readonly boolean[]
-    parsers?: readonly ValueParser[]
   }): RawInt4Reader | TextRowReader | undefined {
     if (this.disabled || !names.length || names.length > 32) return undefined
     const key = JSON.stringify([mode, rowAsArray, names, int4, int8, bool])
     const now = Date.now()
     const cached = this.readers.get(key)
-    if (cached && cached.expiresAt > now) {
-      return 'reader' in cached ? cached.reader : this._getRawTextReader({ entry: cached, parsers: parsers! })
-    }
+    if (cached && cached.expiresAt > now) return cached.reader
     if (cached) this.readers.delete(key)
     const source = [mode === 'text' ? '"use strict";' : '"use strict"; offset += 2;']
     const values: string[] = []
@@ -95,9 +82,7 @@ class RowReaderCache {
           const rawValue = supportsUtf8Slice
             ? `buffer.utf8Slice(offset, offset + length${index})`
             : `buffer.toString('utf8', offset, offset + length${index})`
-          const parsedValue = int8![index]
-            ? rawValue
-            : `(this._parsers[${index}] === p${index} ? Reflect.apply(p${index}, this._parsers, [${rawValue}]) : this._parsers[${index}](${rawValue}))`
+          const parsedValue = int8![index] ? rawValue : `this._parsers[${index}](${rawValue})`
           source.push(
             `value${index} = ${
               bool![index]
@@ -115,26 +100,14 @@ class RowReaderCache {
       values.push(rowAsArray ? value : `${key}: ${value}`)
     })
     source.push(rowAsArray ? `return [${values.join(',')}];` : `return {${values.join(',')}};`)
-    let entry: { reader: RawInt4Reader | TextRowReader; expiresAt: number } | CachedRawTextReader
+    let reader: RawInt4Reader | TextRowReader
     try {
       // Names are JSON-escaped keys; __proto__ stays computed to define an own property.
-      entry =
-        mode === 'raw-text'
-          ? {
-              factory: new Function(
-                'originalBool',
-                ...names.map((_, index) => `p${index}`),
-                `return function(buffer, offset) {${source.join('\n')}}`
-              ) as CachedRawTextReader['factory'],
-              variants: [],
-              expiresAt: now + 300000,
-            }
-          : {
-              reader: new Function(mode === 'text' ? 'rowData' : 'buffer', 'offset', source.join('\n')) as
-                | RawInt4Reader
-                | TextRowReader,
-              expiresAt: now + 300000,
-            }
+      reader = bool?.some(Boolean)
+        ? new Function('originalBool', `return function(buffer, offset) {${source.join('\n')}}`)(boolTextParser)
+        : (new Function(mode === 'text' ? 'rowData' : 'buffer', 'offset', source.join('\n')) as
+            | RawInt4Reader
+            | TextRowReader)
     } catch (cause) {
       if (!(cause instanceof EvalError)) throw cause
       this.disabled = true
@@ -142,17 +115,7 @@ class RowReaderCache {
       return undefined
     }
     if (this.readers.size >= 128) this.readers.delete(this.readers.keys().next().value!)
-    this.readers.set(key, entry)
-    return 'reader' in entry ? entry.reader : this._getRawTextReader({ entry, parsers: parsers! })
-  }
-
-  private _getRawTextReader({ entry, parsers }: { entry: CachedRawTextReader; parsers: readonly ValueParser[] }) {
-    const cached = entry.variants.find((variant) => variant.parsers.every((parser, index) => parser === parsers[index]))
-    if (cached) return cached.reader
-    const parserRefs = [...parsers]
-    const reader = entry.factory(boolTextParser, ...parserRefs)
-    if (entry.variants.length >= 4) entry.variants.shift()
-    entry.variants.push({ parsers: parserRefs, reader })
+    this.readers.set(key, { reader, expiresAt: now + 300000 })
     return reader
   }
 }
@@ -435,7 +398,6 @@ class Result<R extends object = QueryResultRow> {
             names,
             rowAsArray: this.rowAsArray,
             mode: 'raw-text',
-            parsers: this._parsers!,
             int4: this._textInt4,
             bool: fieldDescriptions.map(
               (field, index) => field.dataTypeID === 16 && this._parsers![index] === boolTextParser

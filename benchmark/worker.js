@@ -315,6 +315,7 @@ const main = async () => {
   if (
     [
       'postgresjs',
+      'postgresjs-defaults',
       'postgresjs-unprepared',
       'postgresjs-unprepared-infer',
       'postgresjs-unprepared-typed',

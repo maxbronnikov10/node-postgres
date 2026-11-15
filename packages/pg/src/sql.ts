@@ -1,7 +1,6 @@
 'use strict'
 
 import { QueryExecutor, QueryExecutorError } from './query-executor'
-import { submitQuery, type QuerySubmission } from './query-submission'
 import { escapeIdentifier } from './utils'
 import type { Field } from 'pg-protocol/dist/messages'
 import type { IndependentQueryConfig, QueryExecutorOptions, QueryResult, QueryResultRow } from './types'
@@ -16,37 +15,6 @@ export type SqlRows<R extends object = QueryResultRow> = R[] & {
   readonly count: number | null
   readonly command: string | null
   readonly columns: Field[]
-}
-
-const rowsMetadata = Symbol('rowsMetadata')
-
-class SqlResultRows<R extends object> extends Array<R> {
-  private declare readonly [rowsMetadata]: Pick<SqlRows<R>, 'count' | 'command' | 'columns'>
-
-  static get [Symbol.species](): ArrayConstructor {
-    return Array
-  }
-
-  static fromResult<R extends object>(result: QueryResult): SqlRows<R> {
-    const rows = result.rows as SqlResultRows<R>
-    Object.setPrototypeOf(rows, SqlResultRows.prototype)
-    Object.defineProperty(rows, rowsMetadata, {
-      value: { count: result.rowCount, command: result.command, columns: result.fields },
-    })
-    return rows
-  }
-
-  get count(): number | null {
-    return this[rowsMetadata].count
-  }
-
-  get command(): string | null {
-    return this[rowsMetadata].command
-  }
-
-  get columns(): Field[] {
-    return this[rowsMetadata].columns
-  }
 }
 
 export interface TransactionSql {
@@ -64,7 +32,7 @@ export interface Sql extends TransactionSql {
 type SqlFragment =
   | { kind: 'tag'; strings: readonly string[]; values: readonly unknown[]; scalarText?: string }
   | { kind: 'unsafe'; text: string; values: readonly unknown[] }
-type RunQuery = (request: QuerySubmission) => void
+type RunQuery = (config: IndependentQueryConfig) => Promise<QueryResult>
 
 class SqlTextCache {
   private readonly entries = new Map<readonly string[], { text: string; expiresAt: number }>()
@@ -101,35 +69,14 @@ export class SqlIdentifier {
   }
 }
 
-export class PendingQuery<R extends object = QueryResultRow> extends Promise<SqlRows<R>> {
-  private started = false
-  private readonly resolveResult: QuerySubmission['resolve']
-  private readonly rejectResult: QuerySubmission['reject']
+export class PendingQuery<R extends object = QueryResultRow> implements PromiseLike<SqlRows<R>> {
+  private promise?: Promise<SqlRows<R>>
   private rowMode: 'object' | 'array' = 'object'
-
-  static get [Symbol.species](): PromiseConstructor {
-    return Promise
-  }
 
   constructor(
     private readonly scope: SqlScope,
     private readonly fragment: SqlFragment
-  ) {
-    let resolve!: (rows: SqlRows<R>) => void
-    let reject!: QuerySubmission['reject']
-    super((accept, decline) => {
-      resolve = accept
-      reject = decline
-    })
-    this.rejectResult = reject
-    this.resolveResult = (result) => {
-      try {
-        resolve(SqlResultRows.fromResult<R>(result))
-      } catch (cause) {
-        reject(cause)
-      }
-    }
-  }
+  ) {}
 
   private compile(offset = 0): { text: string; values: readonly unknown[] } {
     this.scope.assertOpen()
@@ -161,46 +108,38 @@ export class PendingQuery<R extends object = QueryResultRow> extends Promise<Sql
     return { text, values }
   }
 
-  execute(): this {
-    if (!this.started) {
-      this.started = true
-      try {
+  execute(): Promise<SqlRows<R>> {
+    if (!this.promise) {
+      this.promise = (async () => {
         const { text, values } = this.compile()
-        this.scope.run({
-          request: {
-            config: { text, values, rowMode: this.rowMode, queryMode: 'extended' },
-            resolve: this.resolveResult,
-            reject: this.rejectResult,
-          },
-          completion: this,
-        })
-      } catch (cause) {
-        this.rejectResult(cause)
-      }
+        const result = await this.scope.run({ text, values, rowMode: this.rowMode, queryMode: 'extended' })
+        const rows = result.rows as SqlRows<R>
+        Object.defineProperty(rows, 'count', { value: result.rowCount })
+        Object.defineProperty(rows, 'command', { value: result.command })
+        Object.defineProperty(rows, 'columns', { value: result.fields })
+        return rows
+      })()
     }
-    return this
+    return this.promise
   }
 
   then<T = SqlRows<R>, U = never>(
     fulfilled?: ((rows: SqlRows<R>) => T | PromiseLike<T>) | null,
     rejected?: ((reason: unknown) => U | PromiseLike<U>) | null
   ): Promise<T | U> {
-    this.execute()
-    return super.then(fulfilled, rejected)
+    return this.execute().then(fulfilled, rejected)
   }
 
   catch<T = never>(rejected?: ((reason: unknown) => T | PromiseLike<T>) | null): Promise<SqlRows<R> | T> {
-    this.execute()
-    return super.then(undefined, rejected)
+    return this.execute().catch(rejected)
   }
 
   finally(onFinally?: (() => void) | null): Promise<SqlRows<R>> {
-    this.execute()
-    return super.finally(onFinally)
+    return this.execute().finally(onFinally)
   }
 
   values<T extends unknown[] = unknown[]>(): PendingQuery<T> {
-    if (this.started) throw new Error('Cannot change row mode after execution has started')
+    if (this.promise) throw new Error('Cannot change row mode after execution has started')
     this.rowMode = 'array'
     return this as unknown as PendingQuery<T>
   }
@@ -249,20 +188,15 @@ class SqlScope {
     return this.tail
   }
 
-  run({ request, completion }: { request: QuerySubmission; completion: Promise<unknown> }): void {
+  run(config: IndependentQueryConfig): Promise<QueryResult> {
     this.assertOpen()
-    if (this.mode === 'independent') return this.runner(request)
-    this.tail.then(() => {
-      try {
-        this.runner(request)
-      } catch (cause) {
-        request.reject(cause)
-      }
-    })
-    this.tail = completion.then(
+    if (this.mode === 'independent') return this.runner(config)
+    const result = this.tail.then(() => this.runner(config))
+    this.tail = result.then(
       () => undefined,
       () => undefined
     )
+    return result
   }
 
   sql(): TransactionSql {
@@ -328,7 +262,7 @@ export default function postgres(url?: string | SqlOptions, options?: SqlOptions
     maxAutoPrepare: prepare === false ? 0 : executorOptions.maxAutoPrepare ?? 256,
     maxInFlightPerConnection: max_pipeline ?? executorOptions.maxInFlightPerConnection,
   })
-  const scope = new SqlScope((request) => executor[submitQuery](request))
+  const scope = new SqlScope((query) => executor.query(query))
   const sql = scope.sql()
   return Object.assign(sql, {
     end: () => {
@@ -341,14 +275,7 @@ export default function postgres(url?: string | SqlOptions, options?: SqlOptions
       const lease = await executor.reserve()
       const query = (queryConfig: IndependentQueryConfig) =>
         lease.query({ ...queryConfig, query_timeout: config.query_timeout ?? 30000, queryMode: 'extended' })
-      const transaction = new SqlScope(
-        (request) =>
-          lease[submitQuery]({
-            ...request,
-            config: { ...request.config, query_timeout: config.query_timeout ?? 30000, queryMode: 'extended' },
-          }),
-        'transaction'
-      )
+      const transaction = new SqlScope(query, 'transaction')
       try {
         await query({ text: 'BEGIN' })
         const value = await callback(transaction.sql())

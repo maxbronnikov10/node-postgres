@@ -4,6 +4,31 @@ const assert = require('node:assert/strict')
 const helper = require('./test-helper')
 const suite = new helper.Suite('cached automatic text descriptions')
 
+suite.test(
+  'zero-parameter extended queries reuse one prepared statement while simple queries keep multiple results',
+  async () => {
+    const client = new helper.pg.Client({ maxAutoPrepare: 1 })
+    try {
+      await client.connect()
+      const text = 'SELECT 17::int AS n'
+
+      const first = await client.query({ text, values: [], queryMode: 'extended' })
+      const second = await client.query({ text, values: [], queryMode: 'extended' })
+      const prepared = await client.query("SELECT statement FROM pg_prepared_statements WHERE name <> ''")
+      const simple = await client.query({ text: 'SELECT 23::int AS n; SELECT 29::int AS n', values: [] })
+
+      assert.deepEqual(first.rows, [{ n: 17 }])
+      assert.deepEqual(second.rows, [{ n: 17 }])
+      assert.deepEqual(prepared.rows, [{ statement: 'SELECT 17::int AS n' }])
+      assert.deepEqual(simple[0].rows, [{ n: 23 }])
+      assert.deepEqual(simple[1].rows, [{ n: 29 }])
+      assert.equal(simple.length, 2)
+    } finally {
+      await client.end()
+    }
+  }
+)
+
 suite.test('mixed object and array rows preserve values and metadata despite caller mutation', async () => {
   const client = new helper.pg.Client({ maxAutoPrepare: 8, pipeline: true })
   try {

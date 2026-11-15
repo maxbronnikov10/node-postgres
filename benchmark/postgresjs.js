@@ -15,16 +15,20 @@ const createPostgresJsWorkload = async ({ pg, arm, profile = 'postgresjs' }) => 
   assert.ok(
     [
       'postgresjs',
+      'postgresjs-defaults',
       'postgresjs-unprepared',
       'postgresjs-unprepared-infer',
       'postgresjs-unprepared-typed',
       'sql-compile',
     ].includes(profile)
   )
-  const prepareStatements = profile === 'postgresjs' || profile === 'sql-compile'
+  const apiDefaults = profile === 'postgresjs-defaults'
+  const prepareStatements = apiDefaults || profile === 'postgresjs' || profile === 'sql-compile'
   const infer = profile === 'postgresjs-unprepared-infer'
   const typedText = profile === 'postgresjs-unprepared-typed'
   const competitor = arm % 2 === 0 && profile !== 'sql-compile'
+  const expectedBackendCount = apiDefaults ? (competitor ? 10 : 4) : 4
+  const maxPipeline = apiDefaults && competitor ? 100 : BURST
   let sql
   let close
   let pool
@@ -35,8 +39,7 @@ const createPostgresJsWorkload = async ({ pg, arm, profile = 'postgresjs' }) => 
     username: process.env.PGUSER,
     password: process.env.PGPASSWORD,
     database: process.env.PGDATABASE,
-    max: 4,
-    max_pipeline: BURST,
+    ...(apiDefaults ? {} : { max: 4, max_pipeline: BURST }),
     prepare: prepareStatements,
     application_name: `pg-bench-postgresjs-${arm}`,
   }
@@ -59,7 +62,8 @@ const createPostgresJsWorkload = async ({ pg, arm, profile = 'postgresjs' }) => 
     const loaded = await import(pathToFileUrl(entry))
     const postgres = loaded.default
     const packageJson = require(path.join(path.dirname(path.dirname(entry)), 'package.json'))
-    if (!prepareStatements) assert.equal(packageJson.version, '4.1.1', 'unprepared baseline must use Postgres.js 4.1.1')
+    if (!prepareStatements || apiDefaults)
+      assert.equal(packageJson.version, '4.1.1', 'baseline must use Postgres.js 4.1.1')
     sql = postgres({
       ...options,
       ...(infer ? { infer: true } : {}),
@@ -178,7 +182,7 @@ const createPostgresJsWorkload = async ({ pg, arm, profile = 'postgresjs' }) => 
         )
       )
       const distinct = new Set(results.map((rows) => rows[0].pid))
-      if (distinct.size === 4) {
+      if (distinct.size === expectedBackendCount) {
         warmed = [...new Map(results.map((rows) => [rows[0].pid, rows[0]])).values()]
         for (const row of warmed) {
           assert.equal(row.app, options.application_name)
@@ -188,7 +192,7 @@ const createPostgresJsWorkload = async ({ pg, arm, profile = 'postgresjs' }) => 
         return
       }
     }
-    throw new Error('could not prewarm four distinct PostgreSQL backends')
+    throw new Error(`could not prewarm ${expectedBackendCount} distinct PostgreSQL backends`)
   }
 
   const setupClient = new pg.Client(tls ? { ssl: tls.ssl } : {})
@@ -236,7 +240,10 @@ const createPostgresJsWorkload = async ({ pg, arm, profile = 'postgresjs' }) => 
       metadata: {
         profile,
         prepare: prepareStatements,
-        infer: competitor ? infer : null,
+        apiDefaults,
+        poolLimits: { connections: expectedBackendCount, maxPipeline },
+        verifiedWarmConnections: warmed.length,
+        infer: competitor || apiDefaults ? infer : null,
         parameterTypeHint: competitor && typedText ? 25 : null,
         competitor: sql.benchmarkMetadata || null,
         warmedConnections: warmed,

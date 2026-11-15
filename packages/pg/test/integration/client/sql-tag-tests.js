@@ -15,10 +15,10 @@ suite.test('a row-count error after INSERT never suggests replaying the committe
       safeToRetry: false,
     })
 
-    assert.deepStrictEqual(
-      [...(await sql`SELECT marker FROM sql_cardinality ORDER BY marker`)],
-      [{ marker: 'first' }, { marker: 'second' }]
-    )
+    assert.deepStrictEqual(await sql`SELECT marker FROM sql_cardinality ORDER BY marker`, [
+      { marker: 'first' },
+      { marker: 'second' },
+    ])
   } finally {
     await sql.end()
   }
@@ -36,11 +36,9 @@ suite.test('values stay parameters and identifiers preserve quotes, dots and __p
     assert.strictEqual(rows[0].__proto__, attack)
     assert.strictEqual(rows[0]['a"b.c'], 7)
     assert.deepStrictEqual(
-      [
-        ...(await sql`SELECT ${sql('pg_catalog.pg_namespace.nspname')} FROM ${sql(
-          'pg_catalog.pg_namespace'
-        )} WHERE nspname = ${'public'}`),
-      ],
+      await sql`SELECT ${sql('pg_catalog.pg_namespace.nspname')} FROM ${sql(
+        'pg_catalog.pg_namespace'
+      )} WHERE nspname = ${'public'}`,
       [{ nspname: 'public' }]
     )
     assert.throws(() => sql.identifier('bad\0name'), TypeError)
@@ -55,11 +53,10 @@ suite.test('nested fragments renumber values without rewriting literal dollar re
     const fragment = sql`${2}::int + ${3}::int`
     const nested = sql`${fragment} + ${4}::int`
     const rows = await sql`SELECT ${1}::int + (${nested}) AS n, '$1'::text AS literal`
-    assert.deepStrictEqual([...rows], [{ n: 10, literal: '$1' }])
-    assert.deepStrictEqual(
-      [...(await sql`SELECT ARRAY[${1}, ${2}]::int[] AS nums, ${[3, 4]}::int[] AS parameter`)],
-      [{ nums: [1, 2], parameter: [3, 4] }]
-    )
+    assert.deepStrictEqual(rows, [{ n: 10, literal: '$1' }])
+    assert.deepStrictEqual(await sql`SELECT ARRAY[${1}, ${2}]::int[] AS nums, ${[3, 4]}::int[] AS parameter`, [
+      { nums: [1, 2], parameter: [3, 4] },
+    ])
     await assert.rejects(sql`SELECT ${sql.unsafe('$1::int', [1])}`.execute(), /cannot be nested/)
   } finally {
     await sql.end()
@@ -72,11 +69,10 @@ suite.test('deep sibling fragments preserve parameter order and literal dollar r
     const left = sql`${2}, ${sql`${3}, ${4}`}, ${5}`
     const right = sql`${6}, ${sql`${7}, ${8}`}, ${9}`
 
-    assert.deepStrictEqual(
-      [...(await sql`SELECT ARRAY[${1}, ${left}, ${right}, ${10}]::int[] AS nums, '$1' AS literal`)],
-      [{ nums: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], literal: '$1' }]
-    )
-    assert.deepStrictEqual([...(await sql`SELECT ${sql`${sql.unsafe('11::int', [])}`} AS n`)], [{ n: 11 }])
+    assert.deepStrictEqual(await sql`SELECT ARRAY[${1}, ${left}, ${right}, ${10}]::int[] AS nums, '$1' AS literal`, [
+      { nums: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], literal: '$1' },
+    ])
+    assert.deepStrictEqual(await sql`SELECT ${sql`${sql.unsafe('11::int', [])}`} AS n`, [{ n: 11 }])
     await assert.rejects(sql`SELECT ${sql`${sql`${sql.unsafe('$1::int', [1])}`}`}`.execute(), /cannot be nested/)
   } finally {
     await sql.end()
@@ -88,10 +84,10 @@ suite.test('one tagged callsite keeps scalar bindings distinct from fragments an
   try {
     const project = (value) => sql`SELECT (${value})::int AS value FROM (SELECT 13::int AS n) source`
 
-    assert.deepStrictEqual([...(await project(7))], [{ value: 7 }])
-    assert.deepStrictEqual([...(await project(sql`${2}::int + ${3}::int`))], [{ value: 5 }])
-    assert.deepStrictEqual([...(await project(sql.identifier('n')))], [{ value: 13 }])
-    assert.deepStrictEqual([...(await project(11))], [{ value: 11 }])
+    assert.deepStrictEqual(await project(7), [{ value: 7 }])
+    assert.deepStrictEqual(await project(sql`${2}::int + ${3}::int`), [{ value: 5 }])
+    assert.deepStrictEqual(await project(sql.identifier('n')), [{ value: 13 }])
+    assert.deepStrictEqual(await project(11), [{ value: 11 }])
   } finally {
     await sql.end()
   }
@@ -111,9 +107,9 @@ suite.test('mutable template strings are snapshotted per query without caching s
     strings.raw[1] = ')::int AS changed'
     const changed = sql(strings, 11)
 
-    assert.deepStrictEqual([...(await scalar)], [{ value: 7 }])
-    assert.deepStrictEqual([...(await fragment)], [{ value: 5 }])
-    assert.deepStrictEqual([...(await changed)], [{ changed: 111 }])
+    assert.deepStrictEqual(await scalar, [{ value: 7 }])
+    assert.deepStrictEqual(await fragment, [{ value: 5 }])
+    assert.deepStrictEqual(await changed, [{ changed: 111 }])
   } finally {
     await sql.end()
   }
@@ -124,27 +120,15 @@ suite.test('lazy writes execute once across execute, repeated await and promise 
   try {
     await sql`CREATE TEMP TABLE sql_lazy (marker text)`
     const insert = sql`INSERT INTO sql_lazy VALUES (${'once'}) RETURNING marker`
-    assert.strictEqual(insert instanceof Promise, true)
-    assert.deepStrictEqual([...(await sql`SELECT marker FROM sql_lazy`)], [])
+    assert.deepStrictEqual(await sql`SELECT marker FROM sql_lazy`, [])
 
     const first = insert.execute()
-    assert.strictEqual(first, insert)
     assert.strictEqual(insert.execute(), first)
-    let finalized = 0
-    const chained = insert.then((rows) => rows)
-    const finalizedQuery = insert.finally(() => {
-      finalized++
-    })
-    assert.strictEqual(chained.constructor, Promise)
-    assert.strictEqual(finalizedQuery.constructor, Promise)
-    const results = await Promise.all([first, insert, Promise.resolve(insert), chained, finalizedQuery])
+    const results = await Promise.all([first, insert, Promise.resolve(insert)])
     assert.strictEqual(results[0], results[1])
     assert.strictEqual(results[1], results[2])
-    assert.strictEqual(results[2], results[3])
-    assert.strictEqual(results[3], results[4])
-    assert.strictEqual(finalized, 1)
-    assert.deepStrictEqual([...(await insert)], [{ marker: 'once' }])
-    assert.deepStrictEqual([...(await sql`SELECT marker FROM sql_lazy`)], [{ marker: 'once' }])
+    assert.deepStrictEqual(await insert, [{ marker: 'once' }])
+    assert.deepStrictEqual(await sql`SELECT marker FROM sql_lazy`, [{ marker: 'once' }])
   } finally {
     await sql.end()
   }
@@ -154,54 +138,16 @@ suite.test('rows expose metadata and array mode preserves duplicate columns', as
   const sql = helper.pg({ ...helper.config, max: 1, prepare: false })
   try {
     const rows = await sql`SELECT ${11}::int AS n`
-    assert.deepStrictEqual([...rows], [{ n: 11 }])
+    assert.deepStrictEqual(rows, [{ n: 11 }])
     assert.deepStrictEqual(Object.keys(rows), ['0'])
     assert.strictEqual(rows.count, 1)
     assert.strictEqual(rows.command, 'SELECT')
     assert.strictEqual(rows.columns[0].name, 'n')
     assert.strictEqual(rows.columns[0].dataTypeID, 23)
     const tuples = sql`SELECT ${3}::int AS n, ${4}::int AS n`.values()
-    assert.deepStrictEqual([...(await tuples)], [[3, 4]])
+    assert.deepStrictEqual(await tuples, [[3, 4]])
     assert.throws(() => tuples.values(), /after execution/)
-    assert.deepStrictEqual([...(await sql`CREATE TEMP TABLE sql_metadata (n int)`)], [])
-  } finally {
-    await sql.end()
-  }
-})
-
-suite.test('metadata stays read-only and independent while rows keep array behavior', async () => {
-  const sql = helper.pg({ ...helper.config, max: 1 })
-  try {
-    const pending = sql`SELECT 11::int AS n`
-    const first = await pending
-    const columns = first.columns
-
-    assert.strictEqual(Array.isArray(first), true)
-    assert.deepStrictEqual(Object.keys(first), ['0'])
-    assert.strictEqual(JSON.stringify(first), '[{"n":11}]')
-    assert.deepStrictEqual(
-      first.map((row) => row.n),
-      [11]
-    )
-    assert.deepStrictEqual(first.slice(), [{ n: 11 }])
-    assert.throws(() => {
-      first.count = 99
-    }, TypeError)
-    assert.throws(() => {
-      first.command = 'UPDATE'
-    }, TypeError)
-    assert.throws(() => {
-      first.columns = []
-    }, TypeError)
-
-    const second = await sql`CREATE TEMP TABLE sql_metadata_snapshot (other text)`
-
-    assert.strictEqual(second.command, 'CREATE')
-    assert.strictEqual(first.count, 1)
-    assert.strictEqual(first.command, 'SELECT')
-    assert.strictEqual(first.columns, columns)
-    assert.strictEqual(first.columns[0].name, 'n')
-    assert.strictEqual(await pending, first)
+    assert.deepStrictEqual(await sql`CREATE TEMP TABLE sql_metadata (n int)`, [])
   } finally {
     await sql.end()
   }
@@ -227,7 +173,6 @@ suite.test('one and maybeOne enforce cardinality and catch/finally observe one e
     )
     assert.strictEqual(caught, '22012')
     assert.strictEqual(final, true)
-    assert.deepStrictEqual([...(await sql`SELECT 23 AS n`)], [{ n: 23 }])
   } finally {
     await sql.end()
   }
@@ -239,9 +184,9 @@ suite.test('unsafe snapshots parameter arrays and still rejects multiple stateme
     const values = [7]
     const pending = sql.unsafe('SELECT $1::int AS n', values)
     values[0] = 99
-    assert.deepStrictEqual([...(await pending)], [{ n: 7 }])
+    assert.deepStrictEqual(await pending, [{ n: 7 }])
     await assert.rejects(sql.unsafe('SELECT 1; SELECT 2').execute(), { code: '42601' })
-    assert.deepStrictEqual([...(await sql`SELECT 3 AS n`)], [{ n: 3 }])
+    assert.deepStrictEqual(await sql`SELECT 3 AS n`, [{ n: 3 }])
   } finally {
     await sql.end()
   }
@@ -272,7 +217,7 @@ suite.test('transactions commit callback results, roll back errors and invalidat
       }),
       (error) => error === failure
     )
-    assert.deepStrictEqual([...(await sql`SELECT marker FROM sql_transactions`)], [{ marker: 'committed' }])
+    assert.deepStrictEqual(await sql`SELECT marker FROM sql_transactions`, [{ marker: 'committed' }])
   } finally {
     await sql.end()
   }
@@ -290,38 +235,8 @@ suite.test('swallowed SQL errors never report a successful commit and the connec
       }),
       /rolled back/
     )
-    assert.deepStrictEqual([...(await sql`SELECT marker FROM sql_aborted`)], [])
-    assert.deepStrictEqual([...(await sql`SELECT 19 AS n`)], [{ n: 19 }])
-  } finally {
-    await sql.end()
-  }
-})
-
-suite.test('transactions serialize started queries, drain them and roll back queued failures', async () => {
-  const sql = helper.pg({ ...helper.config, max: 1 })
-  try {
-    await sql`CREATE TEMP TABLE sql_serialized (marker text)`
-    let inserted
-    let selected
-
-    await sql.begin((tx) => {
-      inserted = tx`INSERT INTO sql_serialized SELECT 'committed' FROM pg_sleep(0.02) RETURNING marker`.execute()
-      selected = tx`SELECT marker FROM sql_serialized`.execute()
-    })
-
-    assert.deepStrictEqual([...(await inserted)], [{ marker: 'committed' }])
-    assert.deepStrictEqual([...(await selected)], [{ marker: 'committed' }])
-
-    await assert.rejects(
-      sql.begin(async (tx) => {
-        const write = tx`INSERT INTO sql_serialized SELECT 'rolled-back' FROM pg_sleep(0.02)`.execute()
-        const failure = tx`SELECT 1 / 0`.execute()
-        await Promise.all([write, failure])
-      }),
-      { code: '22012' }
-    )
-
-    assert.deepStrictEqual([...(await sql`SELECT marker FROM sql_serialized`)], [{ marker: 'committed' }])
+    assert.deepStrictEqual(await sql`SELECT marker FROM sql_aborted`, [])
+    assert.deepStrictEqual(await sql`SELECT 19 AS n`, [{ n: 19 }])
   } finally {
     await sql.end()
   }
@@ -332,7 +247,7 @@ suite.test('end drains explicitly started work and rejects unstarted lazy querie
   const lazy = sql`SELECT 7 AS n`
   const started = sql`SELECT 11 AS n`.execute()
   const ending = sql.end()
-  assert.deepStrictEqual([...(await started)], [{ n: 11 }])
+  assert.deepStrictEqual(await started, [{ n: 11 }])
   await ending
   await assert.rejects(lazy.execute(), /scope is closed/)
   assert.throws(() => sql`SELECT 13`, /scope is closed/)

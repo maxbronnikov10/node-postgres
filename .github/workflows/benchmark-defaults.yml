@@ -15,7 +15,6 @@ permissions:
 
 jobs:
   benchmark:
-    if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 40
     runs-on: ubuntu-24.04
     strategy:
@@ -23,6 +22,9 @@ jobs:
       matrix:
         trial: [1, 2, 3]
         transport: [tcp, tls]
+        pool: [matched, defaults]
+        exclude:
+          - { transport: tls, pool: defaults }
     services:
       postgres:
         image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
@@ -38,12 +40,13 @@ jobs:
       PGUSER: postgres
       PGDATABASE: nodepg_sql_test
       PG_BENCH_POSTGRESJS_MODULE: ${{ github.workspace }}/competitor/node_modules/postgres
+      PG_BENCH_PROFILE: ${{ matrix.pool == 'defaults' && 'postgresjs-defaults' || 'postgresjs' }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: actions/checkout@v4
-        if: matrix.transport == 'tcp'
+        if: matrix.transport == 'tcp' && matrix.pool == 'matched'
         with:
           ref: b239cb414df2c916ab243a0943d410b61e7a83ae
           path: baseline
@@ -58,7 +61,7 @@ jobs:
           yarn install --frozen-lockfile
           yarn build
           yarn tsc -p packages/pg/tsconfig.types.json
-          if [ '${{ matrix.transport }}' = tcp ]; then
+          if [ '${{ matrix.transport }}-${{ matrix.pool }}' = tcp-matched ]; then
             (cd baseline && yarn install --frozen-lockfile && yarn build)
           fi
           npm install --prefix competitor --ignore-scripts --no-audit --no-fund --save-exact postgres@4.1.1
@@ -68,7 +71,7 @@ jobs:
           node benchmark/production-load-check.js
           node benchmark/profile-client-check.js
       - name: Profile client CPU on identical point and mixed workloads
-        if: matrix.transport == 'tcp'
+        if: matrix.transport == 'tcp' && matrix.pool == 'matched'
         run: |
           case '${{ matrix.trial }}' in
             2) arms='1 0' ;;
@@ -79,13 +82,13 @@ jobs:
             node benchmark/profile-client.js "$arm" 'tagged 500-row mixed SELECT, concurrent x16' "results/profiles/mixed-$arm.json"
           done
       - uses: actions/upload-artifact@v4
-        if: always() && matrix.transport == 'tcp'
+        if: always() && matrix.transport == 'tcp' && matrix.pool == 'matched'
         with:
           name: default-cpu-${{ matrix.trial }}
           path: results/profiles/
           retention-days: 1
       - name: Before and after with same-code controls
-        if: matrix.transport == 'tcp'
+        if: matrix.transport == 'tcp' && matrix.pool == 'matched'
         run: >-
           node benchmark/compare.js --base baseline --head . --profile sql-compile
           --scenario 'tagged point SELECT, concurrent x16'
@@ -113,18 +116,19 @@ jobs:
           echo 'PG_BENCH_DELAY_MS=3' >> "$GITHUB_ENV"
       - name: Defaults versus Postgres.js with same-code controls
         run: >-
-          node benchmark/compare.js --base . --head . --profile postgresjs
+          node benchmark/compare.js --base . --head . --profile "$PG_BENCH_PROFILE"
           --rounds 8 --duration 3 --warmup 2
           --output results/comparison.md --json-output results/comparison.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: default-comparison-${{ matrix.trial }}-${{ matrix.transport }}
+          name: default-comparison-${{ matrix.trial }}-${{ matrix.transport }}-${{ matrix.pool }}
           path: |
             results/comparison.*
             results/before-after.*
           retention-days: 1
       - name: Durable mixed load with default automatic decoding
+        if: matrix.pool == 'matched'
         run: >-
           node --expose-gc benchmark/production-load.js --driver tag
           --seconds 600 --rate 1500 --output results/load.json > results/load.log
@@ -134,6 +138,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: default-throughput-${{ matrix.trial }}-${{ matrix.transport }}
+          name: default-throughput-${{ matrix.trial }}-${{ matrix.transport }}-${{ matrix.pool }}
           path: results/
           retention-days: 1

@@ -989,7 +989,7 @@ class Client extends EventEmitter {
         !query.portal &&
         !query.types &&
         Array.isArray(query.values) &&
-        query.values.length > 0 &&
+        (query.values.length > 0 || query.queryMode === 'extended') &&
         typeof query.text === 'string' &&
         /^\s*(SELECT|INSERT|UPDATE|DELETE|MERGE|WITH)\b/i.test(query.text)
       ) {

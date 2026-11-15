@@ -24,6 +24,7 @@ const { execFileSync, fork } = require('child_process')
 const FLOOR = 0.02
 const POSTGRESJS_PROFILES = [
   'postgresjs',
+  'postgresjs-defaults',
   'postgresjs-unprepared',
   'postgresjs-unprepared-infer',
   'postgresjs-unprepared-typed',
@@ -146,10 +147,14 @@ const markdown = ({ labels, rows, rounds, duration, profile }) => {
     )
   } else if (profile === 'sql-compile') {
     lines.push(
-      'Before/after SQL-tag compiler. Four warmed connections, depth 16, prepared statements, identical SQL and checked results. Two independent processes per checkout measure same-code noise.'
+      'Before/after tagged-SQL client. Four warmed connections, depth 16, prepared statements, identical SQL and checked results. Two independent processes per checkout measure same-code noise.'
     )
   } else if (POSTGRESJS_PROFILES.includes(profile)) {
-    if (profile === 'postgresjs') {
+    if (profile === 'postgresjs-defaults') {
+      lines.push(
+        'API defaults with DIFFERENT resource budgets. Base/base2: pinned Postgres.js 4.1.1, max 10 connections and max pipeline 100. Head/head2: pg.postgres, max 4 connections and max pipeline 16. Neither constructor receives max or max_pipeline. All expected backends are verified warm; automatic preparation, identical tagged SQL and checked object/array results on both drivers.'
+      )
+    } else if (profile === 'postgresjs') {
       lines.push(
         'Same checkout. Base/base2 use pinned Postgres.js; head/head2 use pg.postgres. All actors use four warmed connections, max pipeline 16, prepared statements, identical tagged SQL and checked object/array result shapes.'
       )
@@ -212,7 +217,7 @@ const main = async () => {
   const args = parseArgs(process.argv.slice(2))
   if (!args.base || !args.head) {
     throw new Error(
-      'usage: node benchmark/compare.js --base <dir> --head <dir> [--rounds 4] [--duration 3] [--output file] [--json-output file] [--scenario label] [--profile regression|ablation|queue|payload|autocommit|autocommit-prepare|autocommit-pipeline|tls-handshake|tls-steady|rows|row-formats|executor|executor-regression|executor-row-mode|executor-int-parser|postgresjs|postgresjs-unprepared|postgresjs-unprepared-infer|postgresjs-unprepared-typed]'
+      'usage: node benchmark/compare.js --base <dir> --head <dir> [--rounds 4] [--duration 3] [--output file] [--json-output file] [--scenario label] [--profile regression|ablation|queue|payload|autocommit|autocommit-prepare|autocommit-pipeline|tls-handshake|tls-steady|rows|row-formats|executor|executor-regression|executor-row-mode|executor-int-parser|postgresjs|postgresjs-defaults|postgresjs-unprepared|postgresjs-unprepared-infer|postgresjs-unprepared-typed]'
     )
   }
   const rounds = Number(args.rounds || 4)
@@ -342,7 +347,7 @@ const main = async () => {
         args['json-output'],
         JSON.stringify(
           {
-            schemaVersion: 1,
+            schemaVersion: profile === 'postgresjs-defaults' ? 2 : 1,
             profile,
             ...(profile === 'sql-compile'
               ? {
@@ -365,9 +370,10 @@ const main = async () => {
               ? {
                   comparison: {
                     arms: { base: 'Postgres.js', base2: 'Postgres.js', head: 'pg.postgres', head2: 'pg.postgres' },
-                    connections: 4,
-                    maxPipeline: 16,
-                    prepare: profile === 'postgresjs',
+                    connections: profile === 'postgresjs-defaults' ? { base: 10, base2: 10, head: 4, head2: 4 } : 4,
+                    maxPipeline:
+                      profile === 'postgresjs-defaults' ? { base: 100, base2: 100, head: 16, head2: 16 } : 16,
+                    prepare: profile === 'postgresjs' || profile === 'postgresjs-defaults',
                     infer: {
                       base: profile === 'postgresjs-unprepared-infer',
                       base2: profile === 'postgresjs-unprepared-infer',
@@ -381,7 +387,8 @@ const main = async () => {
                       head2: null,
                     },
                     controlQualityLimit: 0.1,
-                    resultFormats: profile === 'postgresjs' ? ['object', 'values'] : ['object'],
+                    resultFormats:
+                      profile === 'postgresjs' || profile === 'postgresjs-defaults' ? ['object', 'values'] : ['object'],
                   },
                   actorMetadata: Object.fromEntries(names.map((name, i) => [name, ready[i].metadata || null])),
                 }
