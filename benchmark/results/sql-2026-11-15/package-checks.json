@@ -1,0 +1,12 @@
+{
+  "packageSourceLocal": "42b4eb7b505d8bc0a26f9a3df1d76067bd2a04eb",
+  "packageSourceRemote": "13b6ba72e90e78cb74e1b0b06566be9d3aa0bf4b",
+  "runtimeChecks": "isolated four-package install; CJS/ESM; SQL tag; transaction; result-limit recovery; signed binary int4; native API absent",
+  "typeChecks": "strict CJS/ESM external consumer, no source checkout resolution",
+  "reproducibility": "four archives byte-reproducible before packaging-only whitelist; unchanged payload files after whitelist checked separately",
+  "nativeExclusion": "npm pack --dry-run with stale dist/native: included before whitelist, excluded after whitelist",
+  "regressions": "transaction row budget deliberately removed in temporary compiled runtime; test fails; original bytes restored; test passes",
+  "limitations": "registry not published; no production, WAN or cold-start measurement",
+  "deliveryChecks": "PASS installed ESM default/named factory, parameterized text, .values(), real PgBouncer transaction retains backend PID; strict CJS/ESM types from delivery archives",
+  "payloadParity": "Every non-manifest archive file is byte-identical before/after whitelist"
+}

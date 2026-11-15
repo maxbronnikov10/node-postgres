@@ -1,0 +1,308 @@
+[
+  {
+    "trial": 1,
+    "phase": "default",
+    "cpu": {
+      "model": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, sequential",
+    "ratio": 1.9715891674709405,
+    "noisePct": 20.37071979398386,
+    "baseQps": 68.37033151333696,
+    "headQps": 134.6164086483151,
+    "minimumRatio": 1.9655513621336633,
+    "maximumRatio": 2.048056806411072,
+    "quality": "inconclusive",
+    "decision": "inconclusive"
+  },
+  {
+    "trial": 1,
+    "phase": "default",
+    "cpu": {
+      "model": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, concurrent x16",
+    "ratio": 4.874401858728268,
+    "noisePct": 7.549368363796438,
+    "baseQps": 415.8163006947405,
+    "headQps": 2057.7536782464963,
+    "minimumRatio": 4.643265227081868,
+    "maximumRatio": 5.456384226406391,
+    "quality": "valid",
+    "decision": "faster"
+  },
+  {
+    "trial": 1,
+    "phase": "infer",
+    "cpu": {
+      "model": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, sequential",
+    "ratio": 1.964571973897855,
+    "noisePct": 24.58413455027937,
+    "baseQps": 69.07753814020953,
+    "headQps": 133.7213611155919,
+    "minimumRatio": 1.5955540184470893,
+    "maximumRatio": 2.0248966122119625,
+    "quality": "inconclusive",
+    "decision": "inconclusive"
+  },
+  {
+    "trial": 1,
+    "phase": "infer",
+    "cpu": {
+      "model": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, concurrent x16",
+    "ratio": 4.880120575825974,
+    "noisePct": 14.168596356146402,
+    "baseQps": 405.6408654004566,
+    "headQps": 2003.9107824700031,
+    "minimumRatio": 4.787057906054759,
+    "maximumRatio": 5.330522446646274,
+    "quality": "inconclusive",
+    "decision": "inconclusive"
+  },
+  {
+    "trial": 1,
+    "phase": "typed",
+    "cpu": {
+      "model": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, sequential",
+    "ratio": 0.996715161946671,
+    "noisePct": 6.4845555950183815,
+    "baseQps": 134.4139347033294,
+    "headQps": 132.44954721809705,
+    "minimumRatio": 0.9779619713078667,
+    "maximumRatio": 1.070853891318624,
+    "quality": "valid",
+    "decision": "no clear effect"
+  },
+  {
+    "trial": 1,
+    "phase": "typed",
+    "cpu": {
+      "model": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, concurrent x16",
+    "ratio": 0.9839392859574849,
+    "noisePct": 8.314917704092428,
+    "baseQps": 2052.7767571542,
+    "headQps": 1993.274367484376,
+    "minimumRatio": 0.9109709993309486,
+    "maximumRatio": 1.0072783915819659,
+    "quality": "valid",
+    "decision": "no clear effect"
+  },
+  {
+    "trial": 2,
+    "phase": "default",
+    "cpu": {
+      "model": "AMD EPYC 7763 64-Core Processor",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, sequential",
+    "ratio": 1.9704588330204738,
+    "noisePct": 18.472324608234437,
+    "baseQps": 67.46240738523272,
+    "headQps": 131.74020649549928,
+    "minimumRatio": 1.9220456886994475,
+    "maximumRatio": 1.9911822683474443,
+    "quality": "inconclusive",
+    "decision": "inconclusive"
+  },
+  {
+    "trial": 2,
+    "phase": "default",
+    "cpu": {
+      "model": "AMD EPYC 7763 64-Core Processor",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, concurrent x16",
+    "ratio": 4.679347465673253,
+    "noisePct": 4.728693337855782,
+    "baseQps": 399.24599309969545,
+    "headQps": 1863.1033594472929,
+    "minimumRatio": 4.477788400224305,
+    "maximumRatio": 4.935124402091028,
+    "quality": "valid",
+    "decision": "faster"
+  },
+  {
+    "trial": 2,
+    "phase": "infer",
+    "cpu": {
+      "model": "AMD EPYC 7763 64-Core Processor",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, sequential",
+    "ratio": 1.9775252559528194,
+    "noisePct": 15.514755303915951,
+    "baseQps": 65.63868672438599,
+    "headQps": 130.20043946318586,
+    "minimumRatio": 1.9108622186771478,
+    "maximumRatio": 2.0110359682737,
+    "quality": "inconclusive",
+    "decision": "inconclusive"
+  },
+  {
+    "trial": 2,
+    "phase": "infer",
+    "cpu": {
+      "model": "AMD EPYC 7763 64-Core Processor",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, concurrent x16",
+    "ratio": 4.667691003222594,
+    "noisePct": 16.404781379006582,
+    "baseQps": 397.320023590173,
+    "headQps": 1854.5556384146157,
+    "minimumRatio": 4.491324893940939,
+    "maximumRatio": 4.886542187812834,
+    "quality": "inconclusive",
+    "decision": "inconclusive"
+  },
+  {
+    "trial": 2,
+    "phase": "typed",
+    "cpu": {
+      "model": "AMD EPYC 7763 64-Core Processor",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, sequential",
+    "ratio": 1.0021041282212813,
+    "noisePct": 24.416352936767318,
+    "baseQps": 128.377660219957,
+    "headQps": 131.90615464688238,
+    "minimumRatio": 0.9883671293358541,
+    "maximumRatio": 1.240910950074565,
+    "quality": "inconclusive",
+    "decision": "inconclusive"
+  },
+  {
+    "trial": 2,
+    "phase": "typed",
+    "cpu": {
+      "model": "AMD EPYC 7763 64-Core Processor",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, concurrent x16",
+    "ratio": 0.9943981673174189,
+    "noisePct": 2.182296602493894,
+    "baseQps": 1906.6669292544593,
+    "headQps": 1854.443775758611,
+    "minimumRatio": 0.9592164812532765,
+    "maximumRatio": 1.0020468696405185,
+    "quality": "valid",
+    "decision": "no clear effect"
+  },
+  {
+    "trial": 3,
+    "phase": "default",
+    "cpu": {
+      "model": "Intel(R) Xeon(R) 6975P-C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, sequential",
+    "ratio": 1.9664134083736071,
+    "noisePct": 9.179957263168959,
+    "baseQps": 66.97118007381758,
+    "headQps": 133.2647291007961,
+    "minimumRatio": 1.898331794645061,
+    "maximumRatio": 2.043386228575823,
+    "quality": "valid",
+    "decision": "faster"
+  },
+  {
+    "trial": 3,
+    "phase": "default",
+    "cpu": {
+      "model": "Intel(R) Xeon(R) 6975P-C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, concurrent x16",
+    "ratio": 4.987099348680992,
+    "noisePct": 1.8017606494914906,
+    "baseQps": 422.5687506993628,
+    "headQps": 2111.1045520966572,
+    "minimumRatio": 4.8256191932253065,
+    "maximumRatio": 5.059744652384444,
+    "quality": "valid",
+    "decision": "faster"
+  },
+  {
+    "trial": 3,
+    "phase": "infer",
+    "cpu": {
+      "model": "Intel(R) Xeon(R) 6975P-C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, sequential",
+    "ratio": 1.9892335789099564,
+    "noisePct": 5.107259844613832,
+    "baseQps": 63.78686048894257,
+    "headQps": 127.20675712848946,
+    "minimumRatio": 1.9350521854073737,
+    "maximumRatio": 2.013702310938113,
+    "quality": "valid",
+    "decision": "faster"
+  },
+  {
+    "trial": 3,
+    "phase": "infer",
+    "cpu": {
+      "model": "Intel(R) Xeon(R) 6975P-C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, concurrent x16",
+    "ratio": 5.026540944083213,
+    "noisePct": 14.425025913729538,
+    "baseQps": 412.62896801256136,
+    "headQps": 2079.397764456119,
+    "minimumRatio": 4.853031897922738,
+    "maximumRatio": 5.171961714736871,
+    "quality": "inconclusive",
+    "decision": "inconclusive"
+  },
+  {
+    "trial": 3,
+    "phase": "typed",
+    "cpu": {
+      "model": "Intel(R) Xeon(R) 6975P-C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, sequential",
+    "ratio": 1.0008293221273448,
+    "noisePct": 8.79327625854125,
+    "baseQps": 129.90700190718164,
+    "headQps": 129.99195334982136,
+    "minimumRatio": 0.9746171500377113,
+    "maximumRatio": 1.0352798246281225,
+    "quality": "valid",
+    "decision": "no clear effect"
+  },
+  {
+    "trial": 3,
+    "phase": "typed",
+    "cpu": {
+      "model": "Intel(R) Xeon(R) 6975P-C",
+      "cores": 4
+    },
+    "scenario": "tagged text SELECT, concurrent x16",
+    "ratio": 0.992607717653724,
+    "noisePct": 5.809066142715347,
+    "baseQps": 2123.8364579541285,
+    "headQps": 2146.7830300314354,
+    "minimumRatio": 0.9870322359936757,
+    "maximumRatio": 1.0542883907433556,
+    "quality": "valid",
+    "decision": "no clear effect"
+  }
+]

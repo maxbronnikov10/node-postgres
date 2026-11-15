@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 1,
+  "profile": "postgresjs-unprepared-typed",
+  "comparison": {
+    "arms": {
+      "base": "Postgres.js",
+      "base2": "Postgres.js",
+      "head": "pg.postgres",
+      "head2": "pg.postgres"
+    },
+    "connections": 4,
+    "maxPipeline": 16,
+    "prepare": false,
+    "infer": {
+      "base": false,
+      "base2": false,
+      "head": null,
+      "head2": null
+    },
+    "parameterTypeHint": {
+      "base": 25,
+      "base2": 25,
+      "head": null,
+      "head2": null
+    },
+    "controlQualityLimit": 0.1,
+    "resultFormats": ["object"]
+  },
+  "actorMetadata": {
+    "base": {
+      "profile": "postgresjs-unprepared-typed",
+      "prepare": false,
+      "infer": false,
+      "parameterTypeHint": 25,
+      "competitor": {
+        "package": "postgres",
+        "version": "4.1.1",
+        "entrySha256": "85fc005b24e19e35fe706a5deec51087e496d6387d3b289e7e8e3561fc556bca",
+        "gitCommit": null
+      },
+      "warmedConnections": [
+        {
+          "pid": 158,
+          "slept": "",
+          "app": "pg-bench-postgresjs-0",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 156,
+          "slept": "",
+          "app": "pg-bench-postgresjs-0",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 157,
+          "slept": "",
+          "app": "pg-bench-postgresjs-0",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 155,
+          "slept": "",
+          "app": "pg-bench-postgresjs-0",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        }
+      ],
+      "ssl": true,
+      "delayMillis": 3
+    },
+    "head": {
+      "profile": "postgresjs-unprepared-typed",
+      "prepare": false,
+      "infer": null,
+      "parameterTypeHint": null,
+      "competitor": null,
+      "warmedConnections": [
+        {
+          "pid": 158,
+          "slept": "",
+          "app": "pg-bench-postgresjs-1",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 156,
+          "slept": "",
+          "app": "pg-bench-postgresjs-1",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 157,
+          "slept": "",
+          "app": "pg-bench-postgresjs-1",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 155,
+          "slept": "",
+          "app": "pg-bench-postgresjs-1",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        }
+      ],
+      "ssl": true,
+      "delayMillis": 3
+    },
+    "base2": {
+      "profile": "postgresjs-unprepared-typed",
+      "prepare": false,
+      "infer": false,
+      "parameterTypeHint": 25,
+      "competitor": {
+        "package": "postgres",
+        "version": "4.1.1",
+        "entrySha256": "85fc005b24e19e35fe706a5deec51087e496d6387d3b289e7e8e3561fc556bca",
+        "gitCommit": null
+      },
+      "warmedConnections": [
+        {
+          "pid": 156,
+          "slept": "",
+          "app": "pg-bench-postgresjs-2",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 157,
+          "slept": "",
+          "app": "pg-bench-postgresjs-2",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 158,
+          "slept": "",
+          "app": "pg-bench-postgresjs-2",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 155,
+          "slept": "",
+          "app": "pg-bench-postgresjs-2",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        }
+      ],
+      "ssl": true,
+      "delayMillis": 3
+    },
+    "head2": {
+      "profile": "postgresjs-unprepared-typed",
+      "prepare": false,
+      "infer": null,
+      "parameterTypeHint": null,
+      "competitor": null,
+      "warmedConnections": [
+        {
+          "pid": 156,
+          "slept": "",
+          "app": "pg-bench-postgresjs-3",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 158,
+          "slept": "",
+          "app": "pg-bench-postgresjs-3",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 157,
+          "slept": "",
+          "app": "pg-bench-postgresjs-3",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        },
+        {
+          "pid": 155,
+          "slept": "",
+          "app": "pg-bench-postgresjs-3",
+          "encrypted": true,
+          "tls_version": "TLSv1.3"
+        }
+      ],
+      "ssl": true,
+      "delayMillis": 3
+    }
+  },
+  "rounds": 8,
+  "durationSeconds": 3,
+  "warmupSeconds": 2,
+  "node": "v22.22.1",
+  "cpu": {
+    "model": "Intel(R) Xeon(R) 6975P-C",
+    "cores": 4
+  },
+  "checkouts": {
+    "base": {
+      "commit": "e8503b133e75b870caabdf0109fa986505b16c37",
+      "tree": "1df4ea62e9275f1930e0e38cfc81725d51332e39"
+    },
+    "head": {
+      "commit": "e8503b133e75b870caabdf0109fa986505b16c37",
+      "tree": "1df4ea62e9275f1930e0e38cfc81725d51332e39"
+    }
+  },
+  "rows": [
+    {
+      "name": "tagged text SELECT, sequential",
+      "base": 129.90700190718164,
+      "head": 129.99195334982136,
+      "speedup": 1.0008293221273448,
+      "min": 0.9746171500377113,
+      "max": 1.0352798246281225,
+      "noise": 0.0879327625854125,
+      "notable": false,
+      "samples": {
+        "base": [
+          139.58346268608886, 143.81590126479094, 142.36377407040956, 117.06139094256943, 118.98701776277764,
+          124.92544765761593, 129.17724012063405, 130.63676369372922
+        ],
+        "head": [
+          136.04043659551115, 143.06777988589002, 142.0187555409848, 121.19129628574737, 119.47273986933516,
+          127.67977711866988, 126.85994066309074, 132.30412958097287
+        ],
+        "base2": [
+          137.0493937141893, 141.40556303851798, 129.84533412431293, 117.1712579873483, 122.99429851729603,
+          124.60189781103912, 128.9852260275567, 129.38312652070843
+        ],
+        "head2": [
+          136.64387472547017, 143.90286872947073, 143.38801314116475, 121.64715340898454, 122.29146709415659,
+          123.44491318729493, 126.62851539440607, 131.9328160719597
+        ]
+      },
+      "orders": [
+        ["head", "base2", "head2", "base"],
+        ["base2", "head2", "base", "head"],
+        ["head2", "base", "head", "base2"],
+        ["base", "head", "base2", "head2"],
+        ["head", "base2", "head2", "base"],
+        ["base2", "head2", "base", "head"],
+        ["head2", "base", "head", "base2"],
+        ["base", "head", "base2", "head2"]
+      ]
+    },
+    {
+      "name": "tagged text SELECT, concurrent x16",
+      "base": 2123.8364579541285,
+      "head": 2146.7830300314354,
+      "speedup": 0.992607717653724,
+      "min": 0.9870322359936757,
+      "max": 1.0542883907433556,
+      "noise": 0.05809066142715347,
+      "notable": false,
+      "samples": {
+        "base": [
+          2162.6145246295723, 2178.0653423130734, 2178.3823477489454, 2183.6915427097215, 2068.259645287294,
+          2085.058391278684, 2072.012190438703, 2077.2633136020218
+        ],
+        "head": [
+          2136.71876688825, 2156.847293174621, 2161.66445122571, 2175.092228883429, 2180.542133069365,
+          2058.019846121176, 2057.2799557409794, 2076.408709940366
+        ],
+        "base2": [
+          2156.1870548730258, 2172.4504751693303, 2178.237378408553, 2194.0369529761842, 2174.188244587409,
+          2096.606563886412, 2083.167353827689, 2087.1357776732816
+        ],
+        "head2": [
+          2142.900076534116, 2159.1348375494404, 2159.3239883564866, 2178.0110910475373, 2053.8729982895893,
+          2082.8746567109765, 2058.429573317696, 2102.6264510173987
+        ]
+      },
+      "orders": [
+        ["head", "base2", "head2", "base"],
+        ["base2", "head2", "base", "head"],
+        ["head2", "base", "head", "base2"],
+        ["base", "head", "base2", "head2"],
+        ["head", "base2", "head2", "base"],
+        ["base2", "head2", "base", "head"],
+        ["head2", "base", "head", "base2"],
+        ["base", "head", "base2", "head2"]
+      ]
+    }
+  ]
+}

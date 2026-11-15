@@ -1,0 +1,39 @@
+{
+  "run": 43670474914,
+  "source": {
+    "local": "9e1c071ad4c652bccc8802ce0221f1fc705df3d9",
+    "remote": "e8503b133e75b870caabdf0109fa986505b16c37",
+    "tree": "1df4ea62e9275f1930e0e38cfc81725d51332e39"
+  },
+  "artifacts": [
+    {
+      "id": 14144262956,
+      "name": "sql-unprepared-1",
+      "digest": "sha256:9f588085e6a5dcf681c87614eaaf3f1de20f53bbc763fb3b788e8f66a9a34665",
+      "size": 10436
+    },
+    {
+      "id": 14144163438,
+      "name": "sql-unprepared-2",
+      "digest": "sha256:1bdae94fde0bed67348fd05035f079e82472988310a436dd8292d9b57d26036d",
+      "size": 10408
+    },
+    {
+      "id": 14144163433,
+      "name": "sql-unprepared-3",
+      "digest": "sha256:fd0136ebbf3f06b0531c52bdd9dce76ca5aa38373edba40106a8e52fa281f0c6",
+      "size": 10330
+    }
+  ],
+  "settings": {
+    "prepare": false,
+    "frontends": 4,
+    "backends": 4,
+    "maxPipeline": 16,
+    "poolMode": "transaction",
+    "maxPreparedStatements": 0,
+    "tls": "TLSv1.3 frontend and backend",
+    "delayMillisPerDirection": 3,
+    "baselineVariants": ["defaults", "infer:true", "explicit text OID 25"]
+  }
+}

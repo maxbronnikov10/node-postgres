@@ -10,8 +10,16 @@ const { DelayedProxy } = require('./delayed-proxy')
 const BURST = 16
 const ROWS = 500
 
-const createPostgresJsWorkload = async ({ pg, arm }) => {
+const createPostgresJsWorkload = async ({ pg, arm, profile = 'postgresjs' }) => {
   assert.ok(Number.isInteger(arm) && arm >= 0 && arm < 4)
+  assert.ok(
+    ['postgresjs', 'postgresjs-unprepared', 'postgresjs-unprepared-infer', 'postgresjs-unprepared-typed'].includes(
+      profile
+    )
+  )
+  const prepareStatements = profile === 'postgresjs'
+  const infer = profile === 'postgresjs-unprepared-infer'
+  const typedText = profile === 'postgresjs-unprepared-typed'
   const competitor = arm % 2 === 0
   let sql
   let close
@@ -25,7 +33,7 @@ const createPostgresJsWorkload = async ({ pg, arm }) => {
     database: process.env.PGDATABASE,
     max: 4,
     max_pipeline: BURST,
-    prepare: true,
+    prepare: prepareStatements,
     application_name: `pg-bench-postgresjs-${arm}`,
   }
   const tls = process.env.PG_BENCH_TLS_CA ? createTlsConfig() : null
@@ -47,7 +55,12 @@ const createPostgresJsWorkload = async ({ pg, arm }) => {
     const loaded = await import(pathToFileUrl(entry))
     const postgres = loaded.default
     const packageJson = require(path.join(path.dirname(path.dirname(entry)), 'package.json'))
-    sql = postgres({ ...options, connection: { application_name: options.application_name } })
+    if (!prepareStatements) assert.equal(packageJson.version, '4.1.1', 'unprepared baseline must use Postgres.js 4.1.1')
+    sql = postgres({
+      ...options,
+      ...(infer ? { infer: true } : {}),
+      connection: { application_name: options.application_name },
+    })
     close = () => sql.end({ timeout: 1 })
     pool = sql
     sql.benchmarkMetadata = {
@@ -117,25 +130,38 @@ const createPostgresJsWorkload = async ({ pg, arm }) => {
     assert.equal(rows[0].matches, true)
     return 1
   }
-  const scenarios = {
-    'tagged point SELECT, sequential': () => point(1),
-    'tagged point SELECT, concurrent x16': batch((lane) => point(lane + 1)),
-    'tagged 500-row object SELECT, concurrent x16': batch(() => bulk(false)),
-    'tagged 500-row array SELECT, concurrent x16': batch(() => bulk(true)),
-    'tagged 500-row mixed SELECT, concurrent x16': batch(mixed),
-    'tagged 1-MiB bytea input, concurrent x2': async () => {
-      await Promise.all([upload(), upload()])
-      return 2
-    },
-    'tagged logged UPDATE, concurrent x16': batch(async (lane) => {
-      const id = arm * 32 + lane + 1
-      const rows = await sql`UPDATE benchmark_sql_rows SET value = 7 WHERE id = ${id} RETURNING id, value`
-      assert.equal(rows.length, 1)
-      assert.equal(rows[0].id, id)
-      assert.equal(rows[0].value, 7)
-      return 1
-    }),
+  const text = async (index) => {
+    const value = 'value-' + index
+    const parameter = competitor && typedText ? sql.typed(value, 25) : value
+    const rows = await sql`SELECT ${parameter}::text AS value`
+    assert.equal(rows.length, 1)
+    assert.deepEqual(rows[0], { value: 'value-' + index })
+    return 1
   }
+  const scenarios = prepareStatements
+    ? {
+        'tagged point SELECT, sequential': () => point(1),
+        'tagged point SELECT, concurrent x16': batch((lane) => point(lane + 1)),
+        'tagged 500-row object SELECT, concurrent x16': batch(() => bulk(false)),
+        'tagged 500-row array SELECT, concurrent x16': batch(() => bulk(true)),
+        'tagged 500-row mixed SELECT, concurrent x16': batch(mixed),
+        'tagged 1-MiB bytea input, concurrent x2': async () => {
+          await Promise.all([upload(), upload()])
+          return 2
+        },
+        'tagged logged UPDATE, concurrent x16': batch(async (lane) => {
+          const id = arm * 32 + lane + 1
+          const rows = await sql`UPDATE benchmark_sql_rows SET value = 7 WHERE id = ${id} RETURNING id, value`
+          assert.equal(rows.length, 1)
+          assert.equal(rows[0].id, id)
+          assert.equal(rows[0].value, 7)
+          return 1
+        }),
+      }
+    : {
+        'tagged text SELECT, sequential': () => text(0),
+        'tagged text SELECT, concurrent x16': batch(text),
+      }
 
   let warmed = []
   const warm = async () => {
@@ -161,7 +187,7 @@ const createPostgresJsWorkload = async ({ pg, arm }) => {
     throw new Error('could not prewarm four distinct PostgreSQL backends')
   }
 
-  const setupClient = new pg.Client()
+  const setupClient = new pg.Client(tls ? { ssl: tls.ssl } : {})
   const setup = async () => {
     try {
       await setupClient.connect()
@@ -179,6 +205,10 @@ const createPostgresJsWorkload = async ({ pg, arm }) => {
     }
   }
   const prepare = async () => {
+    if (!prepareStatements) {
+      for (const scenario of Object.values(scenarios)) await scenario()
+      return
+    }
     await Promise.all([point(1), bulk(), ...Array.from({ length: BURST }, (_, lane) => point(lane + 1))])
     await mixed()
     await upload()
@@ -200,6 +230,10 @@ const createPostgresJsWorkload = async ({ pg, arm }) => {
       setup,
       prepare,
       metadata: {
+        profile,
+        prepare: prepareStatements,
+        infer: competitor ? infer : null,
+        parameterTypeHint: competitor && typedText ? 25 : null,
         competitor: sql.benchmarkMetadata || null,
         warmedConnections: warmed,
         ssl: Boolean(tls),

@@ -1,0 +1,55 @@
+{
+  "benchmarkRun": 43665321310,
+  "benchmarkSource": {
+    "local": "774cd4b4eb3e1e8dcb77679dcbd8ed8b3af00b82",
+    "remote": "99fc7dd1a6de5e06e9b47fe3d1cbf383b4c51f5f",
+    "tree": "4a837ed532164a40a0bd0a9ae693eb8abd081dd0"
+  },
+  "ciRun": 43666835647,
+  "ciSource": {
+    "local": "8bb24904dd5cea2c432a092709db7541ac865ef6",
+    "remote": "d9192c211b52e0e2ebf49ec546e711370cbd2360",
+    "tree": "b2cfa42d2555cfb23b09f437e90954244e53be5e"
+  },
+  "packageSource": {
+    "local": "42b4eb7b505d8bc0a26f9a3df1d76067bd2a04eb",
+    "remote": "13b6ba72e90e78cb74e1b0b06566be9d3aa0bf4b",
+    "tree": "de0c84b476c1c2205cc5635c75553eb78ece4e67"
+  },
+  "unpreparedHarness": {
+    "local": "9e1c071ad4c652bccc8802ce0221f1fc705df3d9",
+    "remote": "e8503b133e75b870caabdf0109fa986505b16c37",
+    "tree": "1df4ea62e9275f1930e0e38cfc81725d51332e39",
+    "run": 43670474914
+  },
+  "artifacts": [
+    {
+      "id": 14143255243,
+      "name": "sql-comparison-2",
+      "size": 11058,
+      "digest": "sha256:6e598be71f292faef4d2d023948d40ab0ccf27d989b254e94172ef3e09d45b7a"
+    },
+    {
+      "id": 14142915664,
+      "name": "sql-comparison-3",
+      "size": 11172,
+      "digest": "sha256:d8ae4c8978e8b64709cfd80ba968820269b15e62a94545bfae6397ac4515f212"
+    },
+    {
+      "id": 14142860738,
+      "name": "sql-comparison-1",
+      "size": 11085,
+      "digest": "sha256:a46ef3f40a7fed5b88389daae4727fca38f24f1beb0865b286164bb3ef8c5c15"
+    }
+  ],
+  "quality": {
+    "sameCodeMaximumDeviationLimit": 0.1,
+    "minimumEffect": 0.02,
+    "allRoundsSameDirection": true
+  },
+  "limitations": [
+    "Hosted 4-vCPU VMs; synthetic SQL and delayed relay; no real WAN or production benchmark.",
+    "Ratio is median of head/base pairs. Same-code bands are observed noise, not confidence intervals.",
+    "Library runtime unchanged by later test, packaging and results commits."
+  ]
+}

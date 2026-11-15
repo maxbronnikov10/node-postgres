@@ -1,0 +1,85 @@
+{
+  "run": 43666835647,
+  "source": "d9192c211b52e0e2ebf49ec546e711370cbd2360",
+  "jobs": [
+    {
+      "id": 132667975940,
+      "name": "lint",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43666835647/job/132667975940"
+    },
+    {
+      "id": 132668087392,
+      "name": "Node.js 26 x PostgreSQL 18",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43666835647/job/132668087392"
+    },
+    {
+      "id": 132668087396,
+      "name": "Node.js 26 x PostgreSQL 13",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43666835647/job/132668087396"
+    },
+    {
+      "id": 132668087404,
+      "name": "Node.js 26 x PostgreSQL 15",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43666835647/job/132668087404"
+    },
+    {
+      "id": 132668087412,
+      "name": "Node.js 20 x PostgreSQL 18",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43666835647/job/132668087412"
+    },
+    {
+      "id": 132668087466,
+      "name": "Node.js 26 x PostgreSQL 14",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43666835647/job/132668087466"
+    },
+    {
+      "id": 132668087490,
+      "name": "Node.js 26 x PostgreSQL 16",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43666835647/job/132668087490"
+    },
+    {
+      "id": 132668087494,
+      "name": "Node.js 22 x PostgreSQL 18",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43666835647/job/132668087494"
+    },
+    {
+      "id": 132668087509,
+      "name": "Node.js 26 x PostgreSQL 17",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43666835647/job/132668087509"
+    },
+    {
+      "id": 132668087663,
+      "name": "Node.js 24 x PostgreSQL 18",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43666835647/job/132668087663"
+    }
+  ],
+  "node22Counts": {
+    "pg": 781,
+    "pool": 92,
+    "protocol": 126,
+    "connectionString": 93,
+    "esm": 26,
+    "total": 1118,
+    "note": "Counts from successful CI output: 1079 check markers plus TAP 13 and 26; pure tsc checks excluded."
+  }
+}
