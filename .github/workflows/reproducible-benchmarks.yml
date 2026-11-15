@@ -14,10 +14,8 @@ concurrency:
 
 env:
   PGHOST: 127.0.0.1
-  PGPORT: '32774'
   PGUSER: postgres
   PGDATABASE: nodepg_ha
-  PG_HA_RO_PORT: '32775'
   PG_HA_TLS_CA: ${{ github.workspace }}/fixture-tls/ca.crt
 
 jobs:
@@ -30,23 +28,27 @@ jobs:
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: nodepg_ha
-        ports: ['32774:5432']
+        ports: ['5432/tcp']
         options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
       ro:
         image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: nodepg_ha
-        ports: ['32775:5432']
+        ports: ['5432/tcp']
         options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
+      - name: Discover mapped PostgreSQL ports
+        run: |
+          echo "PGPORT=${{ job.services.rw.ports[5432] }}" >> "$GITHUB_ENV"
+          echo "PG_HA_RO_PORT=${{ job.services.ro.ports[5432] }}" >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: harness
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: fdba8c23136b567a9d8b9245736595ab95268997
+          ref: e9b6ab8efb70c6a4fc089918d6a96c01ff073044
           path: head
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -76,7 +78,7 @@ jobs:
         run: >-
           python3 harness/benchmark/cloud-pgbouncer.py
           --container nodepg-cloud-pgbouncer-${{ github.run_id }}-${{ github.run_attempt }}
-          --postgres-port 32774 --listen-port 6432 --tls-directory fixture-tls
+          --postgres-port "$PGPORT" --listen-port 6432 --tls-directory fixture-tls
           --output results/regressions/pgbouncer-fixture.json
       - name: Check TLS, backend replacement and prepared statements through PgBouncer
         env:
@@ -113,32 +115,25 @@ jobs:
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: nodepg_ha
-        ports: ['32774:5432']
+        ports: ['5432/tcp']
         options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
+      - name: Discover mapped PostgreSQL ports
+        run: |
+          echo "PGPORT=${{ job.services.rw.ports[5432] }}" >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: harness
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 2550426b2bcb0664d12aaeccbd1493be609e47dc
+          ref: fdba8c23136b567a9d8b9245736595ab95268997
           path: base
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: fdba8c23136b567a9d8b9245736595ab95268997
+          ref: e9b6ab8efb70c6a4fc089918d6a96c01ff073044
           path: head
-          persist-credentials: false
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: 7315ebb06c486343659f787fa23828fc74972679
-          path: budget-base
-          persist-credentials: false
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: c0022e4fc848848656e74bdb2ada47ef9267bc9c
-          path: tls-base
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -147,8 +142,6 @@ jobs:
           cache-dependency-path: |
             base/yarn.lock
             head/yarn.lock
-            tls-base/yarn.lock
-            budget-base/yarn.lock
       - name: Existing native build dependency
         run: |
           sudo apt-get update -qq
@@ -157,7 +150,7 @@ jobs:
         run: |
           corepack enable
           corepack prepare yarn@1.22.22 --activate
-          for arm in base head tls-base budget-base; do
+          for arm in base head; do
             (cd "$arm" && yarn install --frozen-lockfile --non-interactive && yarn build)
           done
       - name: Configure disposable verified TLS
@@ -168,21 +161,21 @@ jobs:
         run: >-
           python3 harness/benchmark/cloud-pgbouncer.py
           --container nodepg-cloud-pgbouncer-${{ github.run_id }}-${{ github.run_attempt }}
-          --postgres-port 32774 --listen-port 6432 --tls-directory fixture-tls
+          --postgres-port "$PGPORT" --listen-port 6432 --tls-directory fixture-tls
           --output results/trial-${{ matrix.trial }}/pgbouncer-fixture.json
-      - name: Validate candidate and TLS baseline through the pooler
+      - name: Validate candidate and JavaScript baseline through the pooler
         env:
           PGPORT: '6432'
           PGDATABASE: nodepg_tls
           PG_BENCH_TLS_CA: ${{ env.PG_HA_TLS_CA }}
           PG_BENCH_ENDPOINT: pgbouncer-transaction
         run: |
-          node harness/benchmark/tls-check.js tls-base > results/trial-${{ matrix.trial }}/tls-base-check.log
+          node harness/benchmark/tls-check.js base > results/trial-${{ matrix.trial }}/base-check.log
           node harness/benchmark/tls-check.js head > results/trial-${{ matrix.trial }}/head-check.log
       - name: Measure paired actors and retain raw rounds
         env:
           PG_BENCH_POOLER_PORT: '6432'
-        run: node harness/benchmark/cloud-run.js base head results/trial-${{ matrix.trial }} measure tls-base budget-base
+        run: node harness/benchmark/cloud-run.js base head results/trial-${{ matrix.trial }} measure
       - name: Remove disposable pooler
         if: always()
         run: |
@@ -212,12 +205,15 @@ jobs:
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: nodepg_ha
-        ports: ['32774:5432']
+        ports: ['5432/tcp']
         options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
+      - name: Discover mapped PostgreSQL ports
+        run: |
+          echo "PGPORT=${{ job.services.rw.ports[5432] }}" >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: fdba8c23136b567a9d8b9245736595ab95268997
+          ref: e9b6ab8efb70c6a4fc089918d6a96c01ff073044
           path: head
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -253,6 +249,27 @@ jobs:
       - name: Check isolated CommonJS and ESM consumer
         working-directory: head
         run: node benchmark/package-check.js ../results/packages ../consumer
+      - name: Check isolated packaged CommonJS and ESM types
+        working-directory: head
+        run: |
+          node - <<'NODE'
+          const fs = require('fs')
+          const path = require('path')
+          const assert = require('assert/strict')
+          const { execFileSync } = require('child_process')
+          const head = process.cwd()
+          const consumer = path.resolve('../consumer')
+          for (const extension of ['cts', 'mts'])
+            fs.copyFileSync(path.join(head, 'packages/pg/test/types', 'executor.' + extension), path.join(consumer, 'executor.' + extension))
+          const compiler = path.join(head, 'node_modules/typescript/bin/tsc')
+          const options = ['--module', 'Node16', '--moduleResolution', 'Node16', '--target', 'ES2020', '--lib', 'ES2022,ESNext.Disposable', '--types', 'node', '--typeRoots', path.join(head, 'node_modules/@types'), '--strict', '--noEmit', '--esModuleInterop', 'executor.cts', 'executor.mts']
+          const listed = execFileSync(process.execPath, [compiler, ...options, '--listFilesOnly'], { cwd: consumer, encoding: 'utf8', timeout: 90000 })
+          const sources = fs.realpathSync(path.join(head, 'packages')) + path.sep
+          for (const file of listed.trim().split(/\r?\n/))
+            assert.ok(!fs.realpathSync(path.resolve(consumer, file)).startsWith(sources), 'Packaged type check reached candidate source: ' + file)
+          execFileSync(process.execPath, [compiler, ...options], { cwd: consumer, stdio: 'inherit', timeout: 90000 })
+          console.log('PASS packaged CJS/ESM types')
+          NODE
       - name: Check optional native artifact with normal libpq build
         working-directory: head
         run: |

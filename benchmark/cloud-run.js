@@ -7,14 +7,15 @@ const path = require('path')
 const { execFileSync, spawnSync } = require('child_process')
 
 class CloudRun {
-  constructor({ base, head, tlsBase, budgetBase, output, mode }) {
+  constructor({ base, head, output, mode }) {
     assert.ok(['measure', 'smoke'].includes(mode))
     this.base = path.resolve(base)
     this.head = path.resolve(head)
-    assert.ok(tlsBase, 'A checkout before TLS record grouping is required')
-    this.tlsBase = path.resolve(tlsBase)
-    assert.ok(budgetBase, 'The initial bounded-result checkout is required')
-    this.budgetBase = path.resolve(budgetBase)
+    assert.equal(this.identity(this.base).commit, 'fdba8c23136b567a9d8b9245736595ab95268997')
+    assert.deepEqual(this.identity(this.head), {
+      commit: 'e9b6ab8efb70c6a4fc089918d6a96c01ff073044',
+      tree: '175fb48d3333e3b0a02b88f2e0f98587d761ea14',
+    })
     this.poolerPort = Number(process.env.PG_BENCH_POOLER_PORT)
     assert.ok(Number.isInteger(this.poolerPort) && this.poolerPort > 0 && this.poolerPort <= 65535)
     this.output = path.resolve(output)
@@ -76,14 +77,9 @@ class CloudRun {
 
   runPhase(phase) {
     const before = this.snapshot()
-    const base =
-      phase.profile === 'executor'
-        ? this.head
-        : phase.base === 'tls-before'
-        ? this.tlsBase
-        : phase.base === 'budget-initial'
-        ? this.budgetBase
-        : this.base
+    const base = ['executor', 'executor-row-mode', 'executor-int-parser'].includes(phase.profile)
+      ? this.head
+      : this.base
     const stem = path.join(this.output, phase.name)
     const measured = this.mode === 'measure'
     const command = [
@@ -166,33 +162,39 @@ class CloudRun {
     this.database = await this.inspectDatabase()
     for (const phase of [
       {
-        name: 'overhead-point',
+        name: 'typescript-point',
         profile: 'executor-regression',
         scenario: 'independent SELECT, 16 concurrent',
         rounds: 8,
         duration: 3,
       },
       {
-        name: 'overhead-rows',
+        name: 'typescript-rows',
         profile: 'executor-regression',
         scenario: '500-row SELECT, 16 concurrent',
         rounds: 8,
         duration: 3,
       },
       {
-        name: 'budget-context-bulk',
-        profile: 'executor-regression',
-        scenario: '500-row SELECT, 16 concurrent',
-        base: 'budget-initial',
-        rounds: 8,
-        duration: 3,
-      },
-      {
-        name: 'overhead-update',
+        name: 'typescript-update',
         profile: 'executor-regression',
         scenario: 'logged UPDATE, 16 concurrent',
         rounds: 8,
         duration: 5,
+      },
+      {
+        name: 'array-rows',
+        profile: 'executor-row-mode',
+        scenario: '500-row SELECT, 16 concurrent',
+        rounds: 8,
+        duration: 3,
+      },
+      {
+        name: 'int4-parser',
+        profile: 'executor-int-parser',
+        scenario: '500-row SELECT, 16 concurrent',
+        rounds: 8,
+        duration: 3,
       },
       {
         name: 'pgbouncer-concurrent',
@@ -203,16 +205,6 @@ class CloudRun {
         tls: true,
         endpoint: 'pooler',
         delayMillis: 3,
-      },
-      {
-        name: 'pgbouncer-large-payload',
-        profile: 'tls-steady',
-        scenario: 'TLS steady, bytea 2 x 1 MiB',
-        rounds: 4,
-        duration: 3,
-        tls: true,
-        endpoint: 'pooler',
-        base: 'tls-before',
       },
     ])
       this.runPhase(phase)
@@ -239,8 +231,6 @@ class CloudRun {
 new CloudRun({
   base: process.argv[2],
   head: process.argv[3],
-  tlsBase: process.argv[6],
-  budgetBase: process.argv[7],
   output: process.argv[4],
   mode: process.argv[5] || 'measure',
 })

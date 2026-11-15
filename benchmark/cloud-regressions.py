@@ -33,6 +33,8 @@ class RegressionRun:
         cases = int(match[1]) if match else int(tap[1]) if tap else sum(
             "✔" in line and "skipping" not in line.lower() for line in text.splitlines()
         )
+        if name == "typed-api":
+            cases = 0
         if name == "workerd":
             vitest = re.search(r"Tests\s+(\d+) passed", text)
             cases = int(vitest[1]) if vitest else 0
@@ -46,6 +48,10 @@ class RegressionRun:
 
     def run(self):
         package = self.root / "packages/pg"
+        self.check("typed-api", self.root, [
+            "node", str(self.root / "node_modules/typescript/bin/tsc"),
+            "-p", "packages/pg/tsconfig.types.json", "--pretty", "false",
+        ])
         # Git preserves only the executable bit, while pgpass requires a private file.
         (package / "test/unit/client/pgpass.file").chmod(0o600)
         files = [

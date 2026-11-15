@@ -154,7 +154,66 @@ class ExecutorWorkload {
   }
 }
 
-const createExecutorWorkload = async ({ pg, arm, maxPending = 1024 }) => {
+class ExecutorRowModeWorkload extends ExecutorWorkload {
+  constructor({ arm, ...options }) {
+    // Reuse the four-frontend executor preparation on every arm.
+    super({ ...options, arm: 1 })
+    this.rowMode = arm % 2 === 0 ? undefined : 'array'
+    this.all = {}
+    this.addCase({ name: '500-row SELECT, 16 concurrent', kind: 'bulk', count: 16 })
+  }
+
+  query({ kind = 'read', index = 0 } = {}) {
+    if (kind !== 'bulk') return super.query({ kind, index })
+    return this.resource
+      .query({
+        name: 'executor_bulk',
+        text: 'SELECT id, value FROM benchmark_executor_rows ORDER BY id LIMIT 500',
+        rowMode: this.rowMode,
+      })
+      .then((result) => {
+        assert.equal(result.rowCount, 500)
+        assert.equal(result.rows.length, 500)
+        assert.equal(result.fields.length, 2)
+        assert.equal(result.fields[0].name, 'id')
+        assert.equal(result.fields[1].name, 'value')
+        if (this.rowMode === 'array') {
+          for (let i = 0; i < result.rows.length; i++) {
+            assert.equal(result.rows[i][0], i + 1)
+            assert.equal(result.rows[i][1], 7)
+          }
+        } else {
+          for (let i = 0; i < result.rows.length; i++) {
+            assert.equal(result.rows[i].id, i + 1)
+            assert.equal(result.rows[i].value, 7)
+          }
+        }
+        return 1
+      })
+  }
+}
+
+class ExecutorIntParserWorkload extends ExecutorWorkload {
+  constructor({ pg, arm, options, ...rest }) {
+    const parserOptions =
+      arm % 2 === 0
+        ? options
+        : {
+            ...options,
+            types: {
+              getTypeParser(oid, format) {
+                if (oid === 23 && (format === undefined || format === 'text')) return Number
+                return pg.types.getTypeParser(oid, format)
+              },
+            },
+          }
+    super({ ...rest, pg, arm: 1, options: parserOptions })
+    this.all = {}
+    this.addCase({ name: '500-row SELECT, 16 concurrent', kind: 'bulk', count: 16 })
+  }
+}
+
+const createExecutorWorkload = async ({ pg, arm, maxPending = 1024, profile = 'executor' }) => {
   assert.ok(Number.isInteger(arm) && arm >= 0 && arm < 4)
   const options = {
     max: 4,
@@ -180,7 +239,10 @@ const createExecutorWorkload = async ({ pg, arm, maxPending = 1024 }) => {
     options.port = proxy.port
   }
   try {
-    const workload = new ExecutorWorkload({ pg, arm, options, setupOptions, maxPending })
+    let Workload = ExecutorWorkload
+    if (profile === 'executor-row-mode') Workload = ExecutorRowModeWorkload
+    else if (profile === 'executor-int-parser') Workload = ExecutorIntParserWorkload
+    const workload = new Workload({ pg, arm, options, setupOptions, maxPending })
     Object.assign(workload, { tls, negotiation, proxy })
     return {
       all: workload.all,
