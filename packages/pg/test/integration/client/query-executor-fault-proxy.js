@@ -79,6 +79,15 @@ class QueryExecutorFaultProxy {
         if (offset + 1 + length > pending.length) break
         const frame = pending.subarray(offset, offset + 1 + length)
         offset += 1 + length
+        if (
+          this.mode === 'drop-commit-ack' &&
+          !this.dropped &&
+          frame[0] === 67 &&
+          frame.subarray(5).equals(Buffer.from('COMMIT\0'))
+        ) {
+          this.dropped = true
+          return close()
+        }
         if (this.mode === 'gate-result' && startupReady && !this.dropped) {
           heldBytes += frame.length
           if (heldBytes > maxFrameLength * 2) {
@@ -99,7 +108,7 @@ class QueryExecutorFaultProxy {
           continue
         }
         if (frame[0] === 90) {
-          if (startupReady && !this.dropped) {
+          if (startupReady && !this.dropped && this.mode !== 'drop-commit-ack') {
             this.dropped = true
             pending = Buffer.alloc(0)
             if (this.mode === 'hold-completion') return
