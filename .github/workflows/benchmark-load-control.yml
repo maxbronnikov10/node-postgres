@@ -1,0 +1,165 @@
+name: Mixed load scheduler control
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [perf/sql-default-throughput]
+    paths:
+      - '.github/workflows/benchmark-load-control.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2, 3]
+    services:
+      postgres:
+        image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: nodepg_sql_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGDATABASE: nodepg_sql_test
+      PGPORT: ${{ job.services.postgres.ports[5432] }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 5d49e9bde021b33656546f468a591d7813207062
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 613a7c39e09af08b7b9a753c8b26709fa6134b92
+          path: baseline
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.1
+          cache: yarn
+      - name: Build both runtimes
+        run: |
+          mkdir results
+          yarn install --frozen-lockfile
+          yarn build
+          (cd baseline && yarn install --frozen-lockfile && yarn build)
+      - name: Record runtime provenance and verify local dependencies
+        run: |
+          node <<'NODE' > results/provenance.json
+          const assert = require('node:assert/strict')
+          const { execFileSync } = require('node:child_process')
+          const { createRequire } = require('node:module')
+          const path = require('node:path')
+          const fs = require('node:fs')
+          const provenance = { node: process.version, runtimes: {} }
+          for (const [name, directory] of [['head', '.'], ['baseline', 'baseline']]) {
+            const root = fs.realpathSync(directory)
+            const fromPg = createRequire(path.join(root, 'packages/pg/package.json'))
+            const dependencies = {}
+            for (const dependency of ['pg-protocol', 'pg-pool']) {
+              const resolved = fs.realpathSync(fromPg.resolve(dependency))
+              const expected = fs.realpathSync(path.join(root, 'packages', dependency))
+              assert.ok(resolved.startsWith(expected + path.sep), `${name}: ${dependency} resolves outside its checkout: ${resolved}`)
+              dependencies[dependency] = resolved
+            }
+            const git = (revision) => execFileSync('git', ['rev-parse', revision], { cwd: root, encoding: 'utf8' }).trim()
+            provenance.runtimes[name] = { commit: git('HEAD'), tree: git('HEAD^{tree}'), dependencies }
+          }
+          console.log(JSON.stringify(provenance, null, 2))
+          NODE
+      - name: Four independent mixed-load processes on the same VM
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/load-control-sampler.cjs" <<'NODE'
+          const path = require('node:path')
+          const { Client } = require(path.join(process.cwd(), 'packages/pg'))
+          let stopped = false
+          process.on('SIGTERM', () => { stopped = true })
+          const client = new Client({ application_name: 'load_control_sampler', query_timeout: 2000 })
+          async function sample() {
+            try {
+              await client.connect()
+              while (!stopped) {
+                const { rows } = await client.query(`
+                  SELECT pid, state, wait_event_type, wait_event, left(query, 160) AS query
+                  FROM pg_stat_activity
+                  WHERE datname = current_database()
+                    AND application_name LIKE 'nodepg_load_%'
+                    AND application_name NOT LIKE 'nodepg_load_admin_%'
+                `)
+                console.log(JSON.stringify({ timestamp: Date.now(), rows }))
+                await new Promise((resolve) => setTimeout(resolve, 1000))
+              }
+            } finally {
+              await client.end()
+            }
+          }
+          sample().catch((error) => { console.error(error); process.exitCode = 1 })
+          NODE
+          case '${{ matrix.trial }}' in
+            1) task_order=(head baseline head baseline) ;;
+            2) task_order=(baseline head baseline head) ;;
+            3) task_order=(head baseline baseline head) ;;
+          esac
+          declare -A task_counts=([head]=0 [baseline]=0)
+          task_failed=0
+          for task_source in "${task_order[@]}"; do
+            task_counts[$task_source]=$(( ${task_counts[$task_source]} + 1 ))
+            task_root=.
+            if [ "$task_source" = baseline ]; then task_root=baseline; fi
+            task_output="results/$task_source-${task_counts[$task_source]}"
+            node "$RUNNER_TEMP/load-control-sampler.cjs" > "$task_output.waits.jsonl" 2> "$task_output.waits.log" &
+            task_sampler_pid=$!
+            if node --expose-gc benchmark/production-load.js --root "$task_root" --driver tag \
+              --seconds 120 --rate 1500 --output "$task_output.json" > "$task_output.log" 2>&1; then
+              task_status=0
+            else
+              task_status=$?
+              task_failed=1
+            fi
+            printf '%s\t%s\n' "$task_output" "$task_status" >> results/exit-status.tsv
+            kill -TERM "$task_sampler_pid" 2>/dev/null || :
+            if wait "$task_sampler_pid"; then
+              task_sampler_status=0
+            else
+              task_sampler_status=$?
+              task_failed=1
+              printf '::error::Wait sampler failed for %s with exit status %s; see waits.log\n' "$task_output" "$task_sampler_status"
+            fi
+            printf '%s.waits\t%s\n' "$task_output" "$task_sampler_status" >> results/exit-status.tsv
+          done
+          exit "$task_failed"
+      - name: Report every result including nonzero failures
+        if: always()
+        run: |
+          node <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require('node:fs')
+          console.log('## Same-VM mixed-load control')
+          if (!fs.existsSync('results')) {
+            console.log('No results: setup failed.')
+            process.exit(0)
+          }
+          if (fs.existsSync('results/exit-status.tsv')) {
+            console.log('\nProcess exit statuses:\n```text\n' + fs.readFileSync('results/exit-status.tsv', 'utf8') + '```')
+          }
+          for (const file of fs.readdirSync('results').filter((file) => /^(head|baseline)-[12]\.json$/.test(file)).sort()) {
+            const result = JSON.parse(fs.readFileSync(`results/${file}`, 'utf8'))
+            console.log(`\n### ${file}\n\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``)
+          }
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-control-${{ matrix.trial }}
+          path: results/
+          retention-days: 1
