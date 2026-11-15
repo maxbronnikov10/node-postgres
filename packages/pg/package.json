@@ -63,7 +63,9 @@
   },
   "files": [
     "lib",
-    "dist",
+    "dist/*.js",
+    "dist/*.d.ts",
+    "dist/crypto",
     "esm",
     "SPONSORS.md"
   ],
