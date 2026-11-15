@@ -325,29 +325,35 @@ class QueryExecutor {
     input: string | IndependentQueryConfig,
     values?: readonly unknown[]
   ): Promise<Result<R>> {
-    const argumentCount = arguments.length
-    return new Promise<Result<R>>((resolve, reject) => {
-      this[submitQuery]({ input, values, argumentCount, resolve: resolve as Task['resolve'], reject })
-    })
-  }
-
-  [submitQuery]({ input, values, argumentCount, resolve, reject }: QuerySubmission): void {
-    if (this._state !== 'open') {
-      reject(this._error({ code: 'PG_EXECUTOR_CLOSED', message: 'Executor is closing' }))
-      return
-    }
+    if (this._state !== 'open')
+      return Promise.reject(this._error({ code: 'PG_EXECUTOR_CLOSED', message: 'Executor is closing' }))
     let prepared: PreparedQuery
     try {
-      prepared = this._toConfig({ input, values, argumentCount })
+      prepared = this._toConfig({ input, values, argumentCount: arguments.length })
     } catch (cause) {
-      reject(
+      return Promise.reject(
         cause instanceof QueryExecutorError
           ? cause
           : this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Invalid independent query', cause })
       )
+    }
+
+    return new Promise<Result<R>>((resolve, reject) => {
+      this._enqueue({ prepared, resolve: resolve as unknown as Task['resolve'], reject })
+    })
+  }
+
+  [submitQuery]({ config, resolve, reject }: QuerySubmission): void {
+    if (this._state !== 'open') {
+      reject(this._error({ code: 'PG_EXECUTOR_CLOSED', message: 'Executor is closing' }))
       return
     }
-    this._enqueue({ prepared, resolve, reject })
+    if (!config.text.trim()) {
+      reject(this._invalid('Query text must be a nonempty string'))
+      return
+    }
+    // SQL owns this config and its values; the public query boundary still snapshots caller-owned inputs.
+    this._enqueue({ prepared: { config, timeout: this._timeout }, resolve, reject })
   }
 
   reserve(): Promise<ReservedConnection> {

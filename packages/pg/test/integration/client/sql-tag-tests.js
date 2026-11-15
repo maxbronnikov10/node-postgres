@@ -63,6 +63,37 @@ suite.test('nested fragments renumber values without rewriting literal dollar re
   }
 })
 
+suite.test('unsafe values are captured before a lazy query can wait in the queue', async () => {
+  const sql = helper.pg({ ...helper.config, max: 1 })
+  try {
+    const values = [7]
+    const pending = sql.unsafe('SELECT $1::int AS n', values)
+
+    values[0] = 99
+
+    assert.deepStrictEqual(await pending, [{ n: 7 }])
+  } finally {
+    await sql.end()
+  }
+})
+
+suite.test('empty tagged SQL fails before submission and leaves the pool usable', async () => {
+  const sql = helper.pg({ ...helper.config, max: 1 })
+  try {
+    const empty = sql`   `
+
+    await assert.rejects(empty.execute(), {
+      code: 'PG_EXECUTOR_INVALID',
+      outcome: 'not-sent',
+      safeToRetry: true,
+    })
+
+    assert.deepStrictEqual(await sql`SELECT 11 AS n`, [{ n: 11 }])
+  } finally {
+    await sql.end()
+  }
+})
+
 suite.test('deep sibling fragments preserve parameter order and literal dollar references', async () => {
   const sql = helper.pg({ ...helper.config, max: 1 })
   try {

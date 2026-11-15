@@ -1,7 +1,7 @@
 'use strict'
 
 import { QueryExecutor, QueryExecutorError } from './query-executor'
-import { submitQuery } from './query-submission'
+import { submitQuery, type SqlQueryConfig } from './query-submission'
 import { escapeIdentifier } from './utils'
 import type { Field } from 'pg-protocol/dist/messages'
 import type { IndependentQueryConfig, QueryExecutorOptions, QueryResult, QueryResultRow } from './types'
@@ -34,7 +34,7 @@ type SqlFragment =
   | { kind: 'tag'; strings: readonly string[]; values: readonly unknown[]; scalarText?: string }
   | { kind: 'unsafe'; text: string; values: readonly unknown[] }
 type SqlSubmission = {
-  config: IndependentQueryConfig
+  config: SqlQueryConfig
   resolve: (result: QueryResult) => void
   reject: (reason: unknown) => void
 }
@@ -282,9 +282,7 @@ export default function postgres(url?: string | SqlOptions, options?: SqlOptions
     maxAutoPrepare: prepare === false ? 0 : executorOptions.maxAutoPrepare ?? 256,
     maxInFlightPerConnection: max_pipeline ?? executorOptions.maxInFlightPerConnection,
   })
-  const scope = new SqlScope(({ config, resolve, reject }) =>
-    executor[submitQuery]({ input: config, argumentCount: 1, resolve, reject })
-  )
+  const scope = new SqlScope(({ config, resolve, reject }) => executor[submitQuery]({ config, resolve, reject }))
   const sql = scope.sql()
   return Object.assign(sql, {
     end: () => {

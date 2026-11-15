@@ -31,6 +31,7 @@ import type {
   TypeFormat,
   Notification,
 } from './types'
+import { Field } from 'pg-protocol/dist/messages'
 import type {
   AuthenticationMD5Password,
   BackendKeyDataMessage,
@@ -627,7 +628,18 @@ class Client extends EventEmitter {
   private _copyRowDescription(message: RowDescriptionMessage): RowDescriptionMessage {
     return {
       ...message,
-      fields: message.fields.map((field) => Object.assign(Object.create(Object.getPrototypeOf(field)), field)),
+      fields: message.fields.map(
+        (field) =>
+          new Field(
+            field.name,
+            field.tableID,
+            field.columnID,
+            field.dataTypeID,
+            field.dataTypeSize,
+            field.dataTypeModifier,
+            field.format
+          )
+      ),
     }
   }
 

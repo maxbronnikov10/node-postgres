@@ -1,6 +1,7 @@
 'use strict'
 
 const assert = require('node:assert/strict')
+const { Field } = require('pg-protocol/dist/messages')
 const helper = require('./test-helper')
 const suite = new helper.Suite('cached automatic text descriptions')
 
@@ -55,6 +56,10 @@ suite.test('mixed object and array rows preserve values and metadata despite cal
     assert.deepEqual(third.rows, [
       { n: 3, label: 'third', enabled: true, payload: { v: 3 }, big: '9007199254740995', empty: null },
     ])
+    assert.ok(first.fields[1] instanceof Field)
+    assert.ok(array.fields[1] instanceof Field)
+    assert.ok(third.fields[1] instanceof Field)
+    assert.deepEqual(array.fields[1], new Field('label', 0, 0, 25, -1, -1, 'text'))
     assert.equal(array.fields[1].name, 'label')
     assert.equal(array.fields[1].dataTypeID, 25)
     assert.equal(third.fields[0].dataTypeID, 23)
