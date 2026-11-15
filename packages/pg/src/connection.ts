@@ -28,6 +28,9 @@ class Connection extends EventEmitter {
   _emitMessage: boolean
   _connecting: boolean | undefined
   _parser: Parser | undefined
+  private _pendingBindExecute: Buffer[] = []
+  private _pendingBindExecuteBytes = 0
+  private _bindExecuteFlush: (() => void) | null = null
 
   constructor(config?: ConnectionConfig) {
     super()
@@ -204,8 +207,21 @@ class Connection extends EventEmitter {
     this._send(serialize.sendSCRAMClientFinalMessage(additionalData))
   }
 
+  private _flushBindExecute() {
+    this._bindExecuteFlush = null
+    if (!this._pendingBindExecuteBytes) return
+    const buffers = this._pendingBindExecute
+    const bytes = this._pendingBindExecuteBytes
+    this._pendingBindExecute = []
+    this._pendingBindExecuteBytes = 0
+    if (this.stream.writable && !this.stream.destroyed) {
+      this.stream.write(Buffer.concat(buffers, bytes))
+    }
+  }
+
   _send(buffer: Buffer) {
-    if (!this.stream.writable) {
+    this._flushBindExecute()
+    if (!this.stream.writable || this.stream.destroyed) {
       return false
     }
     return this.stream.write(buffer)
@@ -228,11 +244,27 @@ class Connection extends EventEmitter {
   /** @internal Cached text queries on the default portal keep their own Sync barrier. */
   bindExecute(config: Parameters<typeof serialize.bind>[0]) {
     const bindBuffer = serialize.bind(config)
-    if (bindBuffer.length <= 4096) {
-      this._send(Buffer.concat([bindBuffer, executeSyncBuffer]))
-    } else {
+    if (bindBuffer.length > 4096) {
       this._send(bindBuffer)
       this._send(executeSyncBuffer)
+      return
+    }
+    if (!this.stream.writable || this.stream.destroyed) {
+      this._flushBindExecute()
+      return
+    }
+    const bytes = bindBuffer.length + executeSyncBuffer.length
+    if (this._pendingBindExecuteBytes + bytes > 65536) this._flushBindExecute()
+    this._pendingBindExecute.push(bindBuffer, executeSyncBuffer)
+    this._pendingBindExecuteBytes += bytes
+    if (this._pendingBindExecuteBytes === 65536 || this.stream.writableNeedDrain) {
+      this._flushBindExecute()
+    } else if (!this._bindExecuteFlush) {
+      const flush = () => {
+        if (this._bindExecuteFlush === flush) this._flushBindExecute()
+      }
+      this._bindExecuteFlush = flush
+      process.nextTick(flush)
     }
   }
 
@@ -242,9 +274,7 @@ class Connection extends EventEmitter {
   }
 
   flush() {
-    if (this.stream.writable) {
-      this.stream.write(flushBuffer)
-    }
+    this._send(flushBuffer)
   }
 
   sync() {
@@ -262,6 +292,7 @@ class Connection extends EventEmitter {
   }
 
   end() {
+    this._flushBindExecute()
     this.setDataRowConsumer(undefined)
     // 0x58 = 'X'
     this._ending = true

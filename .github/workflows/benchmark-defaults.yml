@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   benchmark:
-    timeout-minutes: 35
+    timeout-minutes: 40
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
         if: matrix.transport == 'tcp'
         with:
-          ref: 2db1b547902483602ded74f58c2477253bf30b4b
+          ref: b239cb414df2c916ab243a0943d410b61e7a83ae
           path: baseline
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -65,6 +65,24 @@ jobs:
           cp competitor/package-lock.json results/competitor-lock.json
           npm view postgres@4.1.1 version gitHead dist.integrity --json > results/competitor-registry.json
           node benchmark/production-load-check.js
+          node benchmark/profile-client-check.js
+      - name: Profile client CPU on identical point and mixed workloads
+        if: matrix.transport == 'tcp'
+        run: |
+          case '${{ matrix.trial }}' in
+            2) arms='1 0' ;;
+            *) arms='0 1' ;;
+          esac
+          for arm in $arms; do
+            node benchmark/profile-client.js "$arm" 'tagged point SELECT, concurrent x16' "results/profiles/point-$arm.json"
+            node benchmark/profile-client.js "$arm" 'tagged 500-row mixed SELECT, concurrent x16' "results/profiles/mixed-$arm.json"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.transport == 'tcp'
+        with:
+          name: default-cpu-${{ matrix.trial }}
+          path: results/profiles/
+          retention-days: 1
       - name: Before and after with same-code controls
         if: matrix.transport == 'tcp'
         run: >-
@@ -97,6 +115,14 @@ jobs:
           node benchmark/compare.js --base . --head . --profile postgresjs
           --rounds 8 --duration 3 --warmup 2
           --output results/comparison.md --json-output results/comparison.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: default-comparison-${{ matrix.trial }}-${{ matrix.transport }}
+          path: |
+            results/comparison.*
+            results/before-after.*
+          retention-days: 1
       - name: Durable mixed load with default automatic decoding
         run: >-
           node --expose-gc benchmark/production-load.js --driver tag

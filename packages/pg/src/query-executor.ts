@@ -5,6 +5,7 @@ import Client = require('./client')
 const { DatabaseError } = require('pg-protocol') as typeof import('pg-protocol')
 const { parse: parseConnectionString } = require('pg-connection-string') as typeof import('pg-connection-string')
 import resultBudget = require('./query-result-budget')
+import { submitQuery, type QuerySubmission } from './query-submission'
 import type Result = require('./result')
 import type { BackendMessage } from 'pg-protocol/dist/messages'
 import type {
@@ -53,6 +54,7 @@ interface PreparedQuery {
 }
 export interface ReservedConnection {
   query<R extends object = QueryResultRow>(config: IndependentQueryConfig): Promise<Result<R>>
+  [submitQuery](request: QuerySubmission): void
   release(): void
 }
 interface Task extends PreparedQuery {
@@ -324,22 +326,54 @@ class QueryExecutor {
     input: string | IndependentQueryConfig,
     values?: readonly unknown[]
   ): Promise<Result<R>> {
-    if (this._state !== 'open')
-      return Promise.reject(this._error({ code: 'PG_EXECUTOR_CLOSED', message: 'Executor is closing' }))
+    const argumentCount = arguments.length
+    return new Promise<Result<R>>((resolve, reject) => {
+      this._submit({ input, values, argumentCount, resolve: resolve as unknown as Task['resolve'], reject })
+    })
+  }
+
+  [submitQuery]({ config, resolve, reject }: QuerySubmission): void {
+    this._submit({ input: config, argumentCount: 1, resolve, reject })
+  }
+
+  private _submit({
+    input,
+    values,
+    argumentCount,
+    resolve,
+    reject,
+    lease,
+  }: {
+    input: unknown
+    values?: unknown
+    argumentCount: number
+    resolve: Task['resolve']
+    reject: Task['reject']
+    lease?: Task
+  }): void {
+    if (lease ? lease.state !== 'assigned' || lease.record!.state !== 'reserved' : this._state !== 'open') {
+      reject(
+        this._error({
+          code: 'PG_EXECUTOR_CLOSED',
+          message: lease ? 'Reserved connection is closed' : 'Executor is closing',
+        })
+      )
+      return
+    }
     let prepared: PreparedQuery
     try {
-      prepared = this._toConfig({ input, values, argumentCount: arguments.length })
+      prepared = this._toConfig({ input, values, argumentCount })
     } catch (cause) {
-      return Promise.reject(
+      reject(
         cause instanceof QueryExecutorError
           ? cause
+          : lease
+          ? this._invalid('Invalid reserved query')
           : this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Invalid independent query', cause })
       )
+      return
     }
-
-    return new Promise<Result<R>>((resolve, reject) => {
-      this._enqueue({ prepared, resolve: resolve as unknown as Task['resolve'], reject })
-    })
+    this._enqueue({ prepared, resolve, reject, reservedRecord: lease?.record })
   }
 
   reserve(): Promise<ReservedConnection> {
@@ -353,6 +387,8 @@ class QueryExecutor {
         lease: (task) => {
           resolve({
             query: (config) => this._reservedQuery({ lease: task, config }),
+            [submitQuery]: ({ config, resolve, reject }) =>
+              this._submit({ input: config, argumentCount: 1, resolve, reject, lease: task }),
             release: () => this._release(task),
           })
         },
@@ -367,16 +403,8 @@ class QueryExecutor {
     lease: Task
     config: IndependentQueryConfig
   }): Promise<Result<R>> {
-    if (lease.state !== 'assigned' || lease.record!.state !== 'reserved')
-      return Promise.reject(this._error({ code: 'PG_EXECUTOR_CLOSED', message: 'Reserved connection is closed' }))
-    let prepared: PreparedQuery
-    try {
-      prepared = this._toConfig({ input: config, values: undefined, argumentCount: 1 })
-    } catch (cause) {
-      return Promise.reject(cause instanceof QueryExecutorError ? cause : this._invalid('Invalid reserved query'))
-    }
     return new Promise((resolve, reject) => {
-      this._enqueue({ prepared, resolve: resolve as unknown as Task['resolve'], reject, reservedRecord: lease.record })
+      this._submit({ input: config, argumentCount: 1, resolve: resolve as unknown as Task['resolve'], reject, lease })
     })
   }
 

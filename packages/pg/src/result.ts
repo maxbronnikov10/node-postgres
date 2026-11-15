@@ -11,9 +11,11 @@ const textParsers = require('pg-types/lib/textParsers') as {
 }
 let int4TextParser: ValueParser | undefined
 let int8TextParser: ValueParser | undefined
+let boolTextParser: ValueParser | undefined
 textParsers.init((oid, parser) => {
   if (oid === 23) int4TextParser = parser
   if (oid === 20) int8TextParser = parser
+  if (oid === 16) boolTextParser = parser
 })
 
 const matchRegexp = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/
@@ -30,7 +32,12 @@ class RowReaderCache {
   get(options: ReaderOptions & { mode: 'int4' }): RawInt4Reader | undefined
   get(options: ReaderOptions & { mode: 'text' }): TextRowReader | undefined
   get(
-    options: ReaderOptions & { mode: 'raw-text'; int4: readonly boolean[]; int8: readonly boolean[] }
+    options: ReaderOptions & {
+      mode: 'raw-text'
+      int4: readonly boolean[]
+      int8: readonly boolean[]
+      bool: readonly boolean[]
+    }
   ): RawInt4Reader | undefined
   get({
     names,
@@ -38,12 +45,15 @@ class RowReaderCache {
     mode,
     int4,
     int8,
-  }: ReaderOptions & { mode: 'int4' | 'text' | 'raw-text'; int4?: readonly boolean[]; int8?: readonly boolean[] }):
-    | RawInt4Reader
-    | TextRowReader
-    | undefined {
+    bool,
+  }: ReaderOptions & {
+    mode: 'int4' | 'text' | 'raw-text'
+    int4?: readonly boolean[]
+    int8?: readonly boolean[]
+    bool?: readonly boolean[]
+  }): RawInt4Reader | TextRowReader | undefined {
     if (this.disabled || !names.length || names.length > 32) return undefined
-    const key = JSON.stringify([mode, rowAsArray, names, int4, int8])
+    const key = JSON.stringify([mode, rowAsArray, names, int4, int8, bool])
     const now = Date.now()
     const cached = this.readers.get(key)
     if (cached && cached.expiresAt > now) return cached.reader
@@ -72,22 +82,32 @@ class RowReaderCache {
           const rawValue = supportsUtf8Slice
             ? `buffer.utf8Slice(offset, offset + length${index})`
             : `buffer.toString('utf8', offset, offset + length${index})`
-          source.push(`value${index} = ${int8![index] ? rawValue : `this._parsers[${index}](${rawValue})`};`)
+          const parsedValue = int8![index] ? rawValue : `this._parsers[${index}](${rawValue})`
+          source.push(
+            `value${index} = ${
+              bool![index]
+                ? `length${index} === 1 && this._parsers[${index}] === originalBool && (buffer[offset] === 116 || buffer[offset] === 102) ? buffer[offset] === 116 : ${parsedValue}`
+                : parsedValue
+            };`
+          )
         }
         source.push(`offset += length${index}; }`)
         value = `value${index}`
       } else {
         value = `rowData[${index}] === null ? null : this._parsers[${index}](rowData[${index}])`
       }
-      values.push(rowAsArray ? value : `[${JSON.stringify(name)}]: ${value}`)
+      const key = name === '__proto__' ? `[${JSON.stringify(name)}]` : JSON.stringify(name)
+      values.push(rowAsArray ? value : `${key}: ${value}`)
     })
     source.push(rowAsArray ? `return [${values.join(',')}];` : `return {${values.join(',')}};`)
     let reader: RawInt4Reader | TextRowReader
     try {
-      // Names appear only as JSON-escaped computed keys; all executable source is fixed scaffold.
-      reader = new Function(mode === 'text' ? 'rowData' : 'buffer', 'offset', source.join('\n')) as
-        | RawInt4Reader
-        | TextRowReader
+      // Names are JSON-escaped keys; __proto__ stays computed to define an own property.
+      reader = bool?.some(Boolean)
+        ? new Function('originalBool', `return function(buffer, offset) {${source.join('\n')}}`)(boolTextParser)
+        : (new Function(mode === 'text' ? 'rowData' : 'buffer', 'offset', source.join('\n')) as
+            | RawInt4Reader
+            | TextRowReader)
     } catch (cause) {
       if (!(cause instanceof EvalError)) throw cause
       this.disabled = true
@@ -328,8 +348,8 @@ class Result<R extends object = QueryResultRow> {
       if (parserTypes.getTypeParser(oid, format) !== parser) return false
     }
     this.fields = fields
-    this._parsers = layout.parsers.slice()
-    this._textInt4 = layout.textInt4.slice()
+    this._parsers = [...layout.parsers]
+    this._textInt4 = [...layout.textInt4]
     this._prebuiltEmptyResultObject = { ...layout.emptyResultObject }
     this._prefersRawInt4 = layout.prefersRawInt4
     this._int4Reader = layout.int4Reader
@@ -379,6 +399,9 @@ class Result<R extends object = QueryResultRow> {
             rowAsArray: this.rowAsArray,
             mode: 'raw-text',
             int4: this._textInt4,
+            bool: fieldDescriptions.map(
+              (field, index) => field.dataTypeID === 16 && this._parsers![index] === boolTextParser
+            ),
             // pg-types' original int8 parser is identity for decoded string input.
             int8: fieldDescriptions.map(
               (field, index) => field.dataTypeID === 20 && this._parsers![index] === int8TextParser

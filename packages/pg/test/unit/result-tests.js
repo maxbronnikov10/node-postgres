@@ -287,6 +287,39 @@ for (const rowMode of ['object', 'array']) {
     )
   })
 
+  const boolCases = [
+    { value: 't', expected: true, why: 'canonical true uses the builtin meaning' },
+    { value: 'f', expected: false, why: 'canonical false uses the builtin meaning' },
+    { value: null, expected: null, why: 'SQL NULL stays null' },
+    { value: 'TRUE', expected: true, why: 'accepted noncanonical true keeps parser behavior' },
+    { value: 'no', expected: false, why: 'noncanonical false keeps parser behavior' },
+  ]
+  for (const { value, expected, why } of boolCases) {
+    test(`raw text ${rowMode} bool ${value}: ${why}`, () => {
+      const result = new Result(rowMode)
+      result.addFields([{ name: 'enabled', dataTypeID: 16, format: 'text' }])
+
+      const row = result.parseRawRow(rawRow([value]))
+
+      assert.deepStrictEqual(row, rowMode === 'array' ? [expected] : { enabled: expected })
+    })
+  }
+
+  test(`raw text ${rowMode} bool respects custom parsers before and after metadata`, () => {
+    const fields = [{ name: 'enabled', dataTypeID: 16, format: 'text' }]
+    const builtin = new Result(rowMode)
+    builtin.addFields(fields)
+    const custom = new Result(rowMode, { getTypeParser: () => (value) => `custom:${typeof value}:${value}` })
+    custom.addFields(fields)
+
+    const customRow = custom.parseRawRow(rawRow(['t']))
+    builtin._parsers[0] = (value) => `changed:${typeof value}:${value}`
+    const changedRow = builtin.parseRawRow(rawRow(['f']))
+
+    assert.deepStrictEqual(customRow, rowMode === 'array' ? ['custom:string:t'] : { enabled: 'custom:string:t' })
+    assert.deepStrictEqual(changedRow, rowMode === 'array' ? ['changed:string:f'] : { enabled: 'changed:string:f' })
+  })
+
   test(`raw text ${rowMode} int8 values preserve precision, malformed strings and custom overrides`, () => {
     const fields = [
       { name: 'positive', dataTypeID: 20, format: 'text' },

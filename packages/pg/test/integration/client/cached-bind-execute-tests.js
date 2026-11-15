@@ -27,10 +27,11 @@ for (const { why, value } of sizes) {
       const text = 'SELECT $1::text AS label'
       await client.query(text, ['warm'])
       const sent = []
-      const send = client.connection._send
-      client.connection._send = function (buffer) {
+      const stream = client.connection.stream
+      const write = stream.write
+      stream.write = function (buffer, ...args) {
         sent.push(buffer)
-        return send.call(this, buffer)
+        return write.call(this, buffer, ...args)
       }
 
       const result = await client.query(text, [value])
@@ -97,5 +98,37 @@ suite.test('each cached pipelined write commits independently around an executio
   } finally {
     await control.query(`DROP TABLE IF EXISTS ${table}`)
     await Promise.all([client.end(), control.end()])
+  }
+})
+
+suite.test('cached writes stay ordered around an uncached query in the same tick', async () => {
+  const client = new helper.pg.Client({ maxAutoPrepare: 8, pipeline: true })
+  try {
+    await client.connect()
+    const text = 'SELECT $1::int4 AS n'
+    await client.query(text, [0])
+    const sent = []
+    const stream = client.connection.stream
+    const write = stream.write
+    stream.write = function (buffer, ...args) {
+      sent.push(buffer)
+      return write.call(this, buffer, ...args)
+    }
+
+    const results = await Promise.all([
+      client.query(text, [1]),
+      client.query(text, [2]),
+      client.query('SELECT 3::int4 AS n'),
+      client.query(text, [4]),
+    ])
+
+    assert.deepEqual(
+      results.map((result) => result.rows),
+      [[{ n: 1 }], [{ n: 2 }], [{ n: 3 }], [{ n: 4 }]]
+    )
+    assert.deepEqual(messageCodes(sent), ['B', 'E', 'S', 'B', 'E', 'S', 'Q', 'B', 'E', 'S'])
+    assert.deepEqual(messageCodes([sent[0]]), ['B', 'E', 'S', 'B', 'E', 'S'])
+  } finally {
+    await client.end()
   }
 })
