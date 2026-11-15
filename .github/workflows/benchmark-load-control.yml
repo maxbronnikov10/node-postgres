@@ -32,7 +32,6 @@ jobs:
       PGHOST: 127.0.0.1
       PGUSER: postgres
       PGDATABASE: nodepg_sql_test
-      PGPORT: ${{ job.services.postgres.ports[5432] }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,6 +48,7 @@ jobs:
           cache: yarn
       - name: Build both runtimes
         run: |
+          echo "PGPORT=${{ job.services.postgres.ports[5432] }}" >> "$GITHUB_ENV"
           mkdir results
           yarn install --frozen-lockfile
           yarn build
