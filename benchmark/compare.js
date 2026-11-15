@@ -152,7 +152,7 @@ const markdown = ({ labels, rows, rounds, duration, profile }) => {
   } else if (POSTGRESJS_PROFILES.includes(profile)) {
     if (profile === 'postgresjs-defaults') {
       lines.push(
-        'API defaults with DIFFERENT resource budgets. Base/base2: pinned Postgres.js 4.1.1, max 10 connections and max pipeline 100. Head/head2: pg.postgres, max 2 connections and max pipeline 16. Neither constructor receives max or max_pipeline. All expected backends are verified warm; automatic preparation, identical tagged SQL and checked object/array results on both drivers.'
+        'API defaults with DIFFERENT resource budgets. Base/base2: pinned Postgres.js 4.1.1, max 10 connections and max pipeline 100. Head/head2: pg.postgres, max 4 connections and max pipeline 16. Neither constructor receives max or max_pipeline. All expected backends are verified warm; automatic preparation, identical tagged SQL and checked object/array results on both drivers.'
       )
     } else if (profile === 'postgresjs') {
       lines.push(
@@ -370,7 +370,7 @@ const main = async () => {
               ? {
                   comparison: {
                     arms: { base: 'Postgres.js', base2: 'Postgres.js', head: 'pg.postgres', head2: 'pg.postgres' },
-                    connections: profile === 'postgresjs-defaults' ? { base: 10, base2: 10, head: 2, head2: 2 } : 4,
+                    connections: profile === 'postgresjs-defaults' ? { base: 10, base2: 10, head: 4, head2: 4 } : 4,
                     maxPipeline:
                       profile === 'postgresjs-defaults' ? { base: 100, base2: 100, head: 16, head2: 16 } : 16,
                     prepare: profile === 'postgresjs' || profile === 'postgresjs-defaults',

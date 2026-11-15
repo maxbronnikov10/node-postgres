@@ -278,7 +278,6 @@ export default function postgres(url?: string | SqlOptions, options?: SqlOptions
   const { username, prepare, max_pipeline, ...executorOptions } = config
   const executor = new QueryExecutor({
     ...executorOptions,
-    max: executorOptions.max ?? 2,
     user: executorOptions.user ?? username,
     maxAutoPrepare: prepare === false ? 0 : executorOptions.maxAutoPrepare ?? 256,
     maxInFlightPerConnection: max_pipeline ?? executorOptions.maxInFlightPerConnection,

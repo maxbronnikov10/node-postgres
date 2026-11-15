@@ -44,6 +44,7 @@ interface ConnectionRecord {
   endpoint: Endpoint
   state: 'connecting' | 'ready' | 'reserved' | 'closing'
   tasks: Set<Task>
+  ordinaryTasks: number
   openedAt: number
   timer?: NodeJS.Timeout
 }
@@ -57,6 +58,9 @@ export interface ReservedConnection {
   release(): void
 }
 interface Task extends PreparedQuery {
+  source: 'sql' | 'ordinary'
+  scheduling: 'short-read' | 'ordinary'
+  enqueuedAt: number
   lease?: (task: Task) => void
   transaction?: true
   resolve: (result: Result) => void
@@ -105,6 +109,7 @@ class QueryExecutor {
   private readonly _records: Set<ConnectionRecord>
   private readonly _pending: Map<Task, Task>
   private readonly _timed: Set<Task>
+  private readonly _shortReads: Map<string, number>
   private _deadlineTimer?: NodeJS.Timeout
   private _deadlineAt: number
   private _inFlight: number
@@ -186,6 +191,7 @@ class QueryExecutor {
     this._records = new Set()
     this._pending = new Map()
     this._timed = new Set()
+    this._shortReads = new Map()
     this._deadlineAt = 0
     this._inFlight = 0
     this._resultRows = 0
@@ -353,7 +359,7 @@ class QueryExecutor {
       return
     }
     // SQL owns this config and its values; the public query boundary still snapshots caller-owned inputs.
-    this._enqueue({ prepared: { config, timeout: this._timeout }, resolve, reject })
+    this._enqueue({ prepared: { config, timeout: this._timeout }, resolve, reject, source: 'sql' })
   }
 
   reserve(): Promise<ReservedConnection> {
@@ -419,14 +425,22 @@ class QueryExecutor {
     reject,
     lease,
     reservedRecord,
+    source = 'ordinary',
   }: {
     prepared: PreparedQuery
     resolve: Task['resolve']
     reject: Task['reject']
     lease?: Task['lease']
     reservedRecord?: ConnectionRecord
+    source?: Task['source']
   }) {
+    const enqueuedAt = source === 'sql' || prepared.timeout ? performance.now() : 0
+    const expiresAt = source === 'sql' ? this._shortReads.get(prepared.config.text) : undefined
+    if (expiresAt !== undefined && expiresAt <= enqueuedAt) this._shortReads.delete(prepared.config.text)
     const task: Task = {
+      source,
+      scheduling: expiresAt !== undefined && expiresAt > enqueuedAt ? 'short-read' : 'ordinary',
+      enqueuedAt,
       config: prepared.config,
       timeout: prepared.timeout,
       signal: prepared.signal,
@@ -440,7 +454,7 @@ class QueryExecutor {
       record: undefined,
       resultQuery: undefined,
       resultError: undefined,
-      deadline: prepared.timeout ? performance.now() + prepared.timeout : 0,
+      deadline: prepared.timeout ? enqueuedAt + prepared.timeout : 0,
     }
     try {
       if (task.signal !== undefined) {
@@ -510,6 +524,16 @@ class QueryExecutor {
 
   private _settle({ task, error, result }: { task: Task; error?: QueryExecutorError; result?: Result }) {
     if (task.state === 'done') return
+    if (task.source === 'sql' && task.config.text.length <= 16384) {
+      this._shortReads.delete(task.config.text)
+      if (!error && result?.command === 'SELECT' && result.rows.length <= 1) {
+        const now = performance.now()
+        if (now - task.enqueuedAt <= 10) {
+          if (this._shortReads.size >= 256) this._shortReads.delete(this._shortReads.keys().next().value!)
+          this._shortReads.set(task.config.text, now + 300000)
+        }
+      }
+    }
     if (error) task.resultQuery?._discardResult(error)
     this._resultRows -= task.resultRows
     this._resultBytes -= task.resultBytes
@@ -517,6 +541,7 @@ class QueryExecutor {
     task.resultQuery = undefined
     if (task.state === 'assigned') {
       task.record!.tasks.delete(task)
+      if (task.scheduling === 'ordinary') task.record!.ordinaryTasks--
       this._inFlight--
     } else {
       this._pending.delete(task)
@@ -621,6 +646,7 @@ class QueryExecutor {
     task.state = 'assigned'
     task.record = record
     record.tasks.add(task)
+    if (task.scheduling === 'ordinary') record.ordinaryTasks++
     this._inFlight++
     if (task.lease) {
       this._forgetDeadline(task)
@@ -667,16 +693,29 @@ class QueryExecutor {
       while (this._pending.size) {
         const task = this._pending.values().next().value!
         let record: ConnectionRecord | undefined
+        let preferred: ConnectionRecord | undefined
+        let preferredCount = 0
         for (const candidate of this._records) {
+          if (candidate.state !== 'ready') continue
+          if (task.scheduling === 'short-read' && candidate.ordinaryTasks === 0) {
+            // Keep the preferred pair stable even while both connections are full.
+            preferredCount++
+            if (
+              preferredCount <= 2 &&
+              candidate.tasks.size < this._perConnection &&
+              (!preferred || candidate.tasks.size < preferred.tasks.size)
+            )
+              preferred = candidate
+          }
           if (
-            candidate.state === 'ready' &&
             (task.lease ? candidate.tasks.size === 0 : candidate.tasks.size < this._perConnection) &&
             (!record || candidate.tasks.size < record.tasks.size)
           ) {
             record = candidate
-            if (!candidate.tasks.size) break
+            if (!candidate.tasks.size && task.scheduling === 'ordinary') break
           }
         }
+        record = preferred ?? record
         if (!record) break
         if (task.deadline && task.deadline <= performance.now()) {
           this._expire(task)
@@ -739,6 +778,7 @@ class QueryExecutor {
       endpoint,
       state: 'connecting',
       tasks: new Set(),
+      ordinaryTasks: 0,
       openedAt: performance.now(),
     }
     this._records.add(record)
