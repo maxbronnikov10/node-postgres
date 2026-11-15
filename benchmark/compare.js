@@ -22,6 +22,12 @@ const { execFileSync, fork } = require('child_process')
 // below this nothing is marked whatever the noise said: a same-code band can come out very
 // narrow by luck on a handful of rounds, and a change this small is not worth a look anyway
 const FLOOR = 0.02
+const POSTGRESJS_PROFILES = [
+  'postgresjs',
+  'postgresjs-unprepared',
+  'postgresjs-unprepared-infer',
+  'postgresjs-unprepared-typed',
+]
 
 const parseArgs = (argv) => {
   const args = {}
@@ -138,10 +144,20 @@ const markdown = ({ labels, rows, rounds, duration, profile }) => {
     lines.push(
       'Same candidate checkout. Base/base2: default int4 text parser. Head/head2: opt-in types override, text OID 23 -> Number; binary and every other OID delegate to pg.types.getTypeParser. All arms: QueryExecutor max 4, depth 16, maxPending 1024, maxAutoPrepare 16, identical result budgets, four warmed frontends, object rows and 16 concurrent queries. Only the 500-row SELECT with two int4 columns runs; identical SQL and named preparation, every field of every row checked. This measures canonical PostgreSQL int4 text in a bulk workload; it does not imply a general parsing improvement or a change to int8/numeric.'
     )
-  } else if (profile === 'postgresjs') {
-    lines.push(
-      'Same checkout. Base/base2 use pinned Postgres.js; head/head2 use pg.postgres. All actors use four warmed connections, max pipeline 16, prepared statements, identical tagged SQL and checked object/array result shapes.'
-    )
+  } else if (POSTGRESJS_PROFILES.includes(profile)) {
+    if (profile === 'postgresjs') {
+      lines.push(
+        'Same checkout. Base/base2 use pinned Postgres.js; head/head2 use pg.postgres. All actors use four warmed connections, max pipeline 16, prepared statements, identical tagged SQL and checked object/array result shapes.'
+      )
+    } else {
+      lines.push(
+        `Same checkout. Base/base2 use Postgres.js 4.1.1 with infer: ${
+          profile === 'postgresjs-unprepared-infer'
+        }; explicit text OID hint: ${
+          profile === 'postgresjs-unprepared-typed'
+        }; head/head2 use pg.postgres without an infer option. All actors use prepare: false, four warmed connections, max pipeline 16, identical tagged text SELECT and exact result checks. This measures unnamed queries for transaction PgBouncer with prepared tracking disabled.`
+      )
+    }
     if (process.env.PG_BENCH_TLS_CA) lines.push('Verified TLS 1.3 using the same CA and TLS settings on all actors.')
     if (process.env.PG_BENCH_DELAY_MS !== undefined)
       lines.push(`Opaque TCP relay adds ${process.env.PG_BENCH_DELAY_MS} ms per direction to both actors.`)
@@ -158,13 +174,13 @@ const markdown = ({ labels, rows, rounds, duration, profile }) => {
       'Same checkout. Base: pipeline false. Head: pipeline true. Both use maxAutoPrepare 16; no BEGIN. One client, concurrency: 16.'
     )
   }
-  if (profile === 'postgresjs')
+  if (POSTGRESJS_PROFILES.includes(profile))
     lines.push('Controls above 10% make a row inconclusive even when every ratio is faster or slower.')
   lines.push('')
   lines.push(`| Scenario | Base ${unit} | Head ${unit} | Head / base | Rounds | Noise |`)
   lines.push('| --- | ---: | ---: | ---: | ---: | ---: |')
   for (const row of rows) {
-    const valid = profile !== 'postgresjs' || row.noise <= 0.1
+    const valid = !POSTGRESJS_PROFILES.includes(profile) || row.noise <= 0.1
     const mark = row.notable && valid ? (row.speedup < 1 ? ' :eyes:' : ' :trophy:') : ''
     const change = row.notable && valid ? `**${percent(row.speedup)}**` : percent(row.speedup)
     lines.push(
@@ -192,7 +208,7 @@ const main = async () => {
   const args = parseArgs(process.argv.slice(2))
   if (!args.base || !args.head) {
     throw new Error(
-      'usage: node benchmark/compare.js --base <dir> --head <dir> [--rounds 4] [--duration 3] [--output file] [--json-output file] [--scenario label] [--profile regression|ablation|queue|payload|autocommit|autocommit-prepare|autocommit-pipeline|tls-handshake|tls-steady|rows|row-formats|executor|executor-regression|executor-row-mode|executor-int-parser|postgresjs]'
+      'usage: node benchmark/compare.js --base <dir> --head <dir> [--rounds 4] [--duration 3] [--output file] [--json-output file] [--scenario label] [--profile regression|ablation|queue|payload|autocommit|autocommit-prepare|autocommit-pipeline|tls-handshake|tls-steady|rows|row-formats|executor|executor-regression|executor-row-mode|executor-int-parser|postgresjs|postgresjs-unprepared|postgresjs-unprepared-infer|postgresjs-unprepared-typed]'
     )
   }
   const rounds = Number(args.rounds || 4)
@@ -216,7 +232,7 @@ const main = async () => {
       'executor-regression',
       'executor-row-mode',
       'executor-int-parser',
-      'postgresjs',
+      ...POSTGRESJS_PROFILES,
     ].includes(profile)
   ) {
     throw new Error(`unknown profile: ${profile}`)
@@ -234,7 +250,7 @@ const main = async () => {
       'executor',
       'executor-row-mode',
       'executor-int-parser',
-      'postgresjs',
+      ...POSTGRESJS_PROFILES,
     ].includes(profile) &&
     fs.realpathSync(args.base) !== fs.realpathSync(args.head)
   ) {
@@ -261,7 +277,8 @@ const main = async () => {
       throw new Error(`unknown scenario: ${args.scenario}; available: ${scenarios.join('; ')}`)
     }
     await arms.base.send({ type: 'setup' })
-    if (profile === 'postgresjs') await Promise.all(names.map((name) => arms[name].send({ type: 'prepare' })))
+    if (POSTGRESJS_PROFILES.includes(profile))
+      await Promise.all(names.map((name) => arms[name].send({ type: 'prepare' })))
 
     const ratio = (qps, over, under) => qps[over].map((value, i) => value / qps[under][i])
     const rows = []
@@ -322,15 +339,27 @@ const main = async () => {
           {
             schemaVersion: 1,
             profile,
-            ...(profile === 'postgresjs'
+            ...(POSTGRESJS_PROFILES.includes(profile)
               ? {
                   comparison: {
                     arms: { base: 'Postgres.js', base2: 'Postgres.js', head: 'pg.postgres', head2: 'pg.postgres' },
                     connections: 4,
                     maxPipeline: 16,
-                    prepare: true,
+                    prepare: profile === 'postgresjs',
+                    infer: {
+                      base: profile === 'postgresjs-unprepared-infer',
+                      base2: profile === 'postgresjs-unprepared-infer',
+                      head: null,
+                      head2: null,
+                    },
+                    parameterTypeHint: {
+                      base: profile === 'postgresjs-unprepared-typed' ? 25 : null,
+                      base2: profile === 'postgresjs-unprepared-typed' ? 25 : null,
+                      head: null,
+                      head2: null,
+                    },
                     controlQualityLimit: 0.1,
-                    resultFormats: ['object', 'values'],
+                    resultFormats: profile === 'postgresjs' ? ['object', 'values'] : ['object'],
                   },
                   actorMetadata: Object.fromEntries(names.map((name, i) => [name, ready[i].metadata || null])),
                 }

@@ -1,0 +1,117 @@
+name: SQL unprepared comparison
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [perf/sql-unprepared-benchmark]
+    paths:
+      - 'packages/pg/src/**'
+      - 'packages/pg-protocol/src/**'
+      - 'packages/pg-pool/src/**'
+      - 'benchmark/*.js'
+      - 'benchmark/unprepared/**'
+      - '**/package.json'
+      - 'yarn.lock'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    timeout-minutes: 25
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2, 3]
+    services:
+      postgres:
+        image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: nodepg_sql_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGDATABASE: nodepg_sql_test
+      PG_BENCH_POSTGRESJS_MODULE: ${{ github.workspace }}/competitor/node_modules/postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.1
+          cache: yarn
+      - name: Build and install pinned competitor
+        run: |
+          echo "PGPORT=${{ job.services.postgres.ports[5432] }}" >> "$GITHUB_ENV"
+          yarn install --frozen-lockfile
+          yarn build
+          yarn tsc -p packages/pg/tsconfig.types.json
+          npm install --prefix competitor --ignore-scripts --no-audit --no-fund --save-exact postgres@4.1.1
+          mkdir results
+          cp competitor/package-lock.json results/competitor-lock.json
+          npm view postgres@4.1.1 version gitHead dist.integrity --json > results/competitor-registry.json
+      - name: Configure verified TLS fixture
+        env:
+          FIXTURE: ${{ job.services.postgres.id }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/sql-tls"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=localhost \
+            -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' \
+            -keyout "$RUNNER_TEMP/sql-tls/server.key" -out "$RUNNER_TEMP/sql-tls/server.crt" 2>/dev/null
+          cp "$RUNNER_TEMP/sql-tls/server.crt" "$RUNNER_TEMP/sql-tls/ca.crt"
+          chmod 600 "$RUNNER_TEMP/sql-tls/"*
+          docker exec "$FIXTURE" mkdir -p /tmp/sql-tls
+          docker cp "$RUNNER_TEMP/sql-tls/server.key" "$FIXTURE:/tmp/sql-tls/server.key"
+          docker cp "$RUNNER_TEMP/sql-tls/server.crt" "$FIXTURE:/tmp/sql-tls/server.crt"
+          docker exec "$FIXTURE" chown postgres:postgres /tmp/sql-tls/server.key /tmp/sql-tls/server.crt
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c "ALTER SYSTEM SET ssl='on'"
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c "ALTER SYSTEM SET ssl_cert_file='/tmp/sql-tls/server.crt'"
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c "ALTER SYSTEM SET ssl_key_file='/tmp/sql-tls/server.key'"
+          docker exec "$FIXTURE" psql -U postgres -d nodepg_sql_test -c 'SELECT pg_reload_conf()'
+          echo "PG_BENCH_TLS_CA=$RUNNER_TEMP/sql-tls/server.crt" >> "$GITHUB_ENV"
+      - name: Start transaction PgBouncer without prepared tracking
+        run: |
+          python3 benchmark/unprepared/pooler.py --container nodepg-sql-unprepared \
+            --postgres-port "$PGPORT" --listen-port 6432 \
+            --tls-directory "$RUNNER_TEMP/sql-tls" --output results/pooler.json
+          echo 'PGPORT=6432' >> "$GITHUB_ENV"
+          echo 'PGDATABASE=nodepg_tls' >> "$GITHUB_ENV"
+      - name: Verify live pooler configuration
+        run: node benchmark/unprepared/check-pooler.js results/pooler-config.json
+      - name: Unprepared text with default inference
+        env:
+          PG_BENCH_DELAY_MS: 3
+        run: >-
+          node benchmark/compare.js --base . --head . --profile postgresjs-unprepared
+          --rounds 8 --duration 3 --warmup 2
+          --output results/default.md --json-output results/default.json
+      - name: Unprepared text with Postgres.js infer true
+        env:
+          PG_BENCH_DELAY_MS: 3
+        run: >-
+          node benchmark/compare.js --base . --head . --profile postgresjs-unprepared-infer
+          --rounds 8 --duration 3 --warmup 2
+          --output results/infer.md --json-output results/infer.json
+      - name: Unprepared text with explicit Postgres.js text OID
+        env:
+          PG_BENCH_DELAY_MS: 3
+        run: >-
+          node benchmark/compare.js --base . --head . --profile postgresjs-unprepared-typed
+          --rounds 8 --duration 3 --warmup 2
+          --output results/typed.md --json-output results/typed.json
+      - name: Summary
+        if: always()
+        run: cat results/*.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sql-unprepared-${{ matrix.trial }}
+          path: results/
+          retention-days: 1
