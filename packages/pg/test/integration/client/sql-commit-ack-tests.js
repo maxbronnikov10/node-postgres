@@ -50,7 +50,7 @@ suite.test('a lost COMMIT acknowledgement never replays a committed write or its
     assert.strictEqual(callbackCount, 1)
     assert.strictEqual(proxy.dropped, true)
     assert.strictEqual(proxy.failure, null)
-    assert.deepStrictEqual(await selectAfterCooldown(sql), [{ n: 42 }])
+    assert.deepStrictEqual([...(await selectAfterCooldown(sql))], [{ n: 42 }])
     assert.strictEqual(proxy.acceptedCount, 2)
   } finally {
     try {
