@@ -1,6 +1,7 @@
 'use strict'
 
 import { QueryExecutor, QueryExecutorError } from './query-executor'
+import { submitQuery } from './query-submission'
 import { escapeIdentifier } from './utils'
 import type { Field } from 'pg-protocol/dist/messages'
 import type { IndependentQueryConfig, QueryExecutorOptions, QueryResult, QueryResultRow } from './types'
@@ -32,7 +33,12 @@ export interface Sql extends TransactionSql {
 type SqlFragment =
   | { kind: 'tag'; strings: readonly string[]; values: readonly unknown[]; scalarText?: string }
   | { kind: 'unsafe'; text: string; values: readonly unknown[] }
-type RunQuery = (config: IndependentQueryConfig) => Promise<QueryResult>
+type SqlSubmission = {
+  config: IndependentQueryConfig
+  resolve: (result: QueryResult) => void
+  reject: (reason: unknown) => void
+}
+type RunQuery = (submission: SqlSubmission) => void
 
 class SqlTextCache {
   private readonly entries = new Map<readonly string[], { text: string; expiresAt: number }>()
@@ -110,15 +116,24 @@ export class PendingQuery<R extends object = QueryResultRow> implements PromiseL
 
   execute(): Promise<SqlRows<R>> {
     if (!this.promise) {
-      this.promise = (async () => {
+      this.promise = new Promise<SqlRows<R>>((resolve, reject) => {
         const { text, values } = this.compile()
-        const result = await this.scope.run({ text, values, rowMode: this.rowMode, queryMode: 'extended' })
-        const rows = result.rows as SqlRows<R>
-        Object.defineProperty(rows, 'count', { value: result.rowCount })
-        Object.defineProperty(rows, 'command', { value: result.command })
-        Object.defineProperty(rows, 'columns', { value: result.fields })
-        return rows
-      })()
+        this.scope.run({
+          config: { text, values, rowMode: this.rowMode, queryMode: 'extended' },
+          resolve: (result) => {
+            try {
+              const rows = result.rows as SqlRows<R>
+              Object.defineProperty(rows, 'count', { value: result.rowCount })
+              Object.defineProperty(rows, 'command', { value: result.command })
+              Object.defineProperty(rows, 'columns', { value: result.fields })
+              resolve(rows)
+            } catch (cause) {
+              reject(cause)
+            }
+          },
+          reject,
+        })
+      })
     }
     return this.promise
   }
@@ -188,15 +203,20 @@ class SqlScope {
     return this.tail
   }
 
-  run(config: IndependentQueryConfig): Promise<QueryResult> {
+  run(submission: SqlSubmission): void {
     this.assertOpen()
-    if (this.mode === 'independent') return this.runner(config)
-    const result = this.tail.then(() => this.runner(config))
+    if (this.mode === 'independent') return this.runner(submission)
+    const result = this.tail.then(
+      () =>
+        new Promise<QueryResult>((resolve, reject) => {
+          this.runner({ config: submission.config, resolve, reject })
+        })
+    )
     this.tail = result.then(
       () => undefined,
       () => undefined
     )
-    return result
+    result.then(submission.resolve, submission.reject)
   }
 
   sql(): TransactionSql {
@@ -262,7 +282,9 @@ export default function postgres(url?: string | SqlOptions, options?: SqlOptions
     maxAutoPrepare: prepare === false ? 0 : executorOptions.maxAutoPrepare ?? 256,
     maxInFlightPerConnection: max_pipeline ?? executorOptions.maxInFlightPerConnection,
   })
-  const scope = new SqlScope((query) => executor.query(query))
+  const scope = new SqlScope(({ config, resolve, reject }) =>
+    executor[submitQuery]({ input: config, argumentCount: 1, resolve, reject })
+  )
   const sql = scope.sql()
   return Object.assign(sql, {
     end: () => {
@@ -275,7 +297,9 @@ export default function postgres(url?: string | SqlOptions, options?: SqlOptions
       const lease = await executor.reserve()
       const query = (queryConfig: IndependentQueryConfig) =>
         lease.query({ ...queryConfig, query_timeout: config.query_timeout ?? 30000, queryMode: 'extended' })
-      const transaction = new SqlScope(query, 'transaction')
+      const transaction = new SqlScope(({ config, resolve, reject }) => {
+        query(config).then(resolve, reject)
+      }, 'transaction')
       try {
         await query({ text: 'BEGIN' })
         const value = await callback(transaction.sql())

@@ -144,6 +144,24 @@ suite.test('rows expose metadata and array mode preserves duplicate columns', as
     assert.strictEqual(rows.command, 'SELECT')
     assert.strictEqual(rows.columns[0].name, 'n')
     assert.strictEqual(rows.columns[0].dataTypeID, 23)
+    assert.deepStrictEqual(Object.getOwnPropertyDescriptor(rows, 'count'), {
+      value: 1,
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    })
+    assert.deepStrictEqual(Object.getOwnPropertyDescriptor(rows, 'command'), {
+      value: 'SELECT',
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    })
+    assert.deepStrictEqual(Object.getOwnPropertyDescriptor(rows, 'columns'), {
+      value: rows.columns,
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    })
     const tuples = sql`SELECT ${3}::int AS n, ${4}::int AS n`.values()
     assert.deepStrictEqual(await tuples, [[3, 4]])
     assert.throws(() => tuples.values(), /after execution/)

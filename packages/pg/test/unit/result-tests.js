@@ -196,6 +196,28 @@ for (const rowMode of ['object', 'array']) {
   })
 }
 
+for (const rowMode of ['object', 'array']) {
+  test(`raw ${rowMode} rows decode big-endian lengths across byte boundaries and preserve nulls`, () => {
+    const result = new Result(rowMode)
+    result.addFields([
+      { name: 'empty', dataTypeID: 25, format: 'text' },
+      { name: 'medium', dataTypeID: 25, format: 'text' },
+      { name: 'large', dataTypeID: 25, format: 'text' },
+      { name: 'nullable', dataTypeID: 25, format: 'text' },
+      { name: 'id', dataTypeID: 23, format: 'text' },
+    ])
+    const medium = 'я'.repeat(128)
+    const large = 'x'.repeat(65536)
+
+    const row = result.parseRawRow(rawRow(['', medium, large, null, '42']))
+
+    assert.deepStrictEqual(
+      row,
+      rowMode === 'array' ? ['', medium, large, null, 42] : { empty: '', medium, large, nullable: null, id: 42 }
+    )
+  })
+}
+
 function rawInt4({ value, rowMode = 'object', types }) {
   const result = new Result(rowMode, types)
   result.addFields([{ name: 'n', dataTypeID: 23, format: 'text' }])

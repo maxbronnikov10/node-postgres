@@ -1,6 +1,7 @@
 'use strict'
 
 import events = require('events')
+import { submitQuery, type QuerySubmission } from './query-submission'
 import Client = require('./client')
 const { DatabaseError } = require('pg-protocol') as typeof import('pg-protocol')
 const { parse: parseConnectionString } = require('pg-connection-string') as typeof import('pg-connection-string')
@@ -324,22 +325,29 @@ class QueryExecutor {
     input: string | IndependentQueryConfig,
     values?: readonly unknown[]
   ): Promise<Result<R>> {
-    if (this._state !== 'open')
-      return Promise.reject(this._error({ code: 'PG_EXECUTOR_CLOSED', message: 'Executor is closing' }))
+    const argumentCount = arguments.length
+    return new Promise<Result<R>>((resolve, reject) => {
+      this[submitQuery]({ input, values, argumentCount, resolve: resolve as Task['resolve'], reject })
+    })
+  }
+
+  [submitQuery]({ input, values, argumentCount, resolve, reject }: QuerySubmission): void {
+    if (this._state !== 'open') {
+      reject(this._error({ code: 'PG_EXECUTOR_CLOSED', message: 'Executor is closing' }))
+      return
+    }
     let prepared: PreparedQuery
     try {
-      prepared = this._toConfig({ input, values, argumentCount: arguments.length })
+      prepared = this._toConfig({ input, values, argumentCount })
     } catch (cause) {
-      return Promise.reject(
+      reject(
         cause instanceof QueryExecutorError
           ? cause
           : this._error({ code: 'PG_EXECUTOR_INVALID', message: 'Invalid independent query', cause })
       )
+      return
     }
-
-    return new Promise<Result<R>>((resolve, reject) => {
-      this._enqueue({ prepared, resolve: resolve as unknown as Task['resolve'], reject })
-    })
+    this._enqueue({ prepared, resolve, reject })
   }
 
   reserve(): Promise<ReservedConnection> {

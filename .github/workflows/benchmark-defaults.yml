@@ -70,6 +70,19 @@ jobs:
           npm view postgres@4.1.1 version gitHead dist.integrity --json > results/competitor-registry.json
           node benchmark/production-load-check.js
           node benchmark/profile-client-check.js
+      - name: Early API-default point-query comparison
+        if: matrix.transport == 'tcp' && matrix.pool == 'defaults'
+        run: >-
+          node benchmark/compare.js --base . --head . --profile postgresjs-defaults
+          --scenario 'tagged point SELECT, concurrent x16'
+          --rounds 8 --duration 3 --warmup 2
+          --output results/early-point.md --json-output results/early-point.json
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.transport == 'tcp' && matrix.pool == 'defaults'
+        with:
+          name: default-early-point-${{ matrix.trial }}
+          path: results/early-point.*
+          retention-days: 1
       - name: Profile client CPU on identical point and mixed workloads
         if: matrix.transport == 'tcp' && matrix.pool == 'matched'
         run: |

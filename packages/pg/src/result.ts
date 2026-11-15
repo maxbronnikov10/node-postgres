@@ -63,8 +63,9 @@ class RowReaderCache {
     names.forEach((name, index) => {
       let value: string
       if (mode !== 'text') {
+        // The protocol parser already validates every field's length and buffer bounds.
         source.push(
-          `const length${index} = buffer.readInt32BE(offset); offset += 4;`,
+          `const length${index} = (buffer[offset] << 24) | (buffer[offset + 1] << 16) | (buffer[offset + 2] << 8) | buffer[offset + 3]; offset += 4;`,
           `let value${index} = null;`,
           `if (length${index} !== -1) {`
         )
