@@ -1,0 +1,24 @@
+{
+  "typecheck": {
+    "build": "passed",
+    "cjsEsmFixtures": "passed"
+  },
+  "sqlTagIntegration": {
+    "passed": 11
+  },
+  "nestedOffsetMutation": {
+    "rejectedExitCode": 255,
+    "restoredSqlSha256": "30d28e160ea7236a635e3e5da1325c9fdc497697262f146c826674ace3d69069"
+  },
+  "packageConsumer": {
+    "passed": true,
+    "installedOutsideCheckout": true,
+    "sourceLinks": false,
+    "moduleFormats": ["CJS", "ESM"],
+    "features": ["executor result-limit recovery", "binary int4", "tagged SQL", "transaction"]
+  },
+  "packageSqlSha256": "30d28e160ea7236a635e3e5da1325c9fdc497697262f146c826674ace3d69069",
+  "harnessSelfCheck": "passed",
+  "actualProductionAccess": false,
+  "paidCloudOrStudentCreditsUsed": false
+}

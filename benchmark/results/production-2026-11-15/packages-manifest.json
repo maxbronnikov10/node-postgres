@@ -1,0 +1,30 @@
+{
+  "sourceCommit": "08c0513d90a42875f9f1d1760950107880a98d57",
+  "sourceTree": "607e901d79cad4c58afed7693c398b0018bdc733",
+  "node": "v22.22.1",
+  "npm": "11.21.2",
+  "defaultInstall": ["pg", "pg-protocol", "pg-pool", "pg-connection-string"],
+  "packages": {
+    "pg": {
+      "version": "8.23.1-perf.20261114.g08c0513d90a4",
+      "filename": "pg-8.23.1-perf.20261114.g08c0513d90a4.tgz",
+      "sha256": "d5370166b7471b7a00883d1062159006389ffb684b3eb45c6a4a4da5c5680bba"
+    },
+    "pg-protocol": {
+      "version": "1.16.1-perf.20261114.g08c0513d90a4",
+      "filename": "pg-protocol-1.16.1-perf.20261114.g08c0513d90a4.tgz",
+      "sha256": "07f70d81490354fe8a3e70ac6596296f5552f254dcbdb41fba621ab43d48edf0"
+    },
+    "pg-pool": {
+      "version": "3.14.0-perf.20261114.g08c0513d90a4",
+      "filename": "pg-pool-3.14.0-perf.20261114.g08c0513d90a4.tgz",
+      "sha256": "d9eafc397668ea0fd3b46f3083d505b6689fbc2c85f9d202cb351d74073f2827"
+    },
+    "pg-connection-string": {
+      "version": "2.14.1-perf.20261114.g08c0513d90a4",
+      "filename": "pg-connection-string-2.14.1-perf.20261114.g08c0513d90a4.tgz",
+      "sha256": "ab741ed83f8e394fd61f152128ecfdf2885b556bebc55282ff656912274b95c2"
+    }
+  },
+  "limitations": "Experimental coordinated Node.js package set. No native bindings or browser/worker adapters."
+}

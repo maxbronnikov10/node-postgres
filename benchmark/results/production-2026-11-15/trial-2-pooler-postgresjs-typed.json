@@ -1,0 +1,380 @@
+{
+  "driver": "postgresjs-typed",
+  "driverVersion": "4.1.1",
+  "nodeVersion": "v22.22.1",
+  "fixtureRows": 100000,
+  "description": "isolated durable OLTP-like synthetic load; not evidence of production capacity",
+  "delayMillisPerDirection": 3,
+  "settings": {
+    "max": 4,
+    "depth": 16,
+    "maxPending": null,
+    "applicationOutstandingCap": 1024,
+    "prepare": false,
+    "queryTimeoutMillis": null
+  },
+  "initial": {
+    "server": {
+      "version": "PostgreSQL 18.7 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "database": "nodepg_sql_test",
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on",
+      "server_version_num": "180007"
+    },
+    "connections": [
+      {
+        "pid": 876,
+        "application_name": "nodepg_load_9249_postgresjs-typed",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 877,
+        "application_name": "nodepg_load_9249_postgresjs-typed",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 878,
+        "application_name": "nodepg_load_9249_postgresjs-typed",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 879,
+        "application_name": "nodepg_load_9249_postgresjs-typed",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      }
+    ],
+    "connectionObservation": "server backends; not proof of frontend pool size behind a pooler"
+  },
+  "final": {
+    "server": {
+      "version": "PostgreSQL 18.7 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "database": "nodepg_sql_test",
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on",
+      "server_version_num": "180007"
+    },
+    "connections": [
+      {
+        "pid": 876,
+        "application_name": "nodepg_load_9249_postgresjs-typed",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 877,
+        "application_name": "nodepg_load_9249_postgresjs-typed",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 878,
+        "application_name": "nodepg_load_9249_postgresjs-typed",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 879,
+        "application_name": "nodepg_load_9249_postgresjs-typed",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      }
+    ],
+    "connectionObservation": "server backends; not proof of frontend pool size behind a pooler"
+  },
+  "load": {
+    "offered": 120000,
+    "offeredPerSecond": 1000,
+    "offeredSeconds": 120,
+    "generationMillis": 119999.132133,
+    "drainMillis": 45.750631999995676,
+    "completedAtWindowEnd": 119992,
+    "completed": 120000,
+    "failed": 0,
+    "schedulerRejections": {
+      "count": 0,
+      "outcome": "not-sent",
+      "safeToRetry": true,
+      "latency": {
+        "count": 0,
+        "p50Millis": 0,
+        "p95Millis": 0,
+        "p99Millis": 0,
+        "maxMillis": 0
+      }
+    },
+    "errors": {},
+    "acknowledgedWrites": 9600,
+    "acknowledgedTransactions": 2400,
+    "successLatency": {
+      "count": 120000,
+      "p50Millis": 8.703,
+      "p95Millis": 10.095,
+      "p99Millis": 42.495,
+      "maxMillis": 57.887
+    },
+    "failureLatency": {
+      "count": 0,
+      "p50Millis": 0,
+      "p95Millis": 0,
+      "p99Millis": 0,
+      "maxMillis": 0
+    },
+    "peakOutstanding": 20,
+    "diagnosticsAvailable": false,
+    "peakWaiting": null,
+    "peakInFlight": null,
+    "cpu": {
+      "user": 13416969,
+      "system": 3305443
+    },
+    "memory": {
+      "start": {
+        "rss": 70443008,
+        "heapTotal": 17666048,
+        "heapUsed": 7951528,
+        "external": 2481709,
+        "arrayBuffers": 98901
+      },
+      "peak": {
+        "rss": 109821952,
+        "heapUsed": 30760264
+      },
+      "end": {
+        "rss": 109015040,
+        "heapTotal": 51490816,
+        "heapUsed": 22189408,
+        "external": 3284508,
+        "arrayBuffers": 901373
+      },
+      "afterGC": {
+        "rss": 109015040,
+        "heapTotal": 49393664,
+        "heapUsed": 8743672,
+        "external": 3284508,
+        "arrayBuffers": 106769
+      }
+    },
+    "eventLoopP99Millis": 10.960895,
+    "samples": [
+      {
+        "elapsedMillis": 10007.676989000001,
+        "completed": 9997,
+        "failed": 0,
+        "schedulerRejected": 0,
+        "outstanding": 10,
+        "memory": {
+          "rss": 106541056,
+          "heapTotal": 51105792,
+          "heapUsed": 27059160,
+          "external": 3576198,
+          "arrayBuffers": 1188183
+        },
+        "cpu": {
+          "user": 1584942,
+          "system": 308613
+        }
+      },
+      {
+        "elapsedMillis": 20015.044642,
+        "completed": 20005,
+        "failed": 0,
+        "schedulerRejected": 0,
+        "outstanding": 10,
+        "memory": {
+          "rss": 108892160,
+          "heapTotal": 51490816,
+          "heapUsed": 23338808,
+          "external": 3283404,
+          "arrayBuffers": 895389
+        },
+        "cpu": {
+          "user": 2695461,
+          "system": 600612
+        }
+      },
+      {
+        "elapsedMillis": 30021.371935,
+        "completed": 30011,
+        "failed": 0,
+        "schedulerRejected": 0,
+        "outstanding": 9,
+        "memory": {
+          "rss": 109256704,
+          "heapTotal": 51228672,
+          "heapUsed": 18821288,
+          "external": 2945948,
+          "arrayBuffers": 557933
+        },
+        "cpu": {
+          "user": 3783947,
+          "system": 884274
+        }
+      },
+      {
+        "elapsedMillis": 40030.033799,
+        "completed": 40019,
+        "failed": 0,
+        "schedulerRejected": 0,
+        "outstanding": 10,
+        "memory": {
+          "rss": 109342720,
+          "heapTotal": 51752960,
+          "heapUsed": 14786320,
+          "external": 2523066,
+          "arrayBuffers": 135051
+        },
+        "cpu": {
+          "user": 4868077,
+          "system": 1155307
+        }
+      },
+      {
+        "elapsedMillis": 50040.190176,
+        "completed": 50030,
+        "failed": 0,
+        "schedulerRejected": 0,
+        "outstanding": 9,
+        "memory": {
+          "rss": 109383680,
+          "heapTotal": 51752960,
+          "heapUsed": 22297048,
+          "external": 3456282,
+          "arrayBuffers": 1068267
+        },
+        "cpu": {
+          "user": 5971251,
+          "system": 1419387
+        }
+      },
+      {
+        "elapsedMillis": 60048.450915999994,
+        "completed": 60039,
+        "failed": 0,
+        "schedulerRejected": 0,
+        "outstanding": 9,
+        "memory": {
+          "rss": 109559808,
+          "heapTotal": 51752960,
+          "heapUsed": 18142440,
+          "external": 3087010,
+          "arrayBuffers": 698995
+        },
+        "cpu": {
+          "user": 7037950,
+          "system": 1706908
+        }
+      },
+      {
+        "elapsedMillis": 70050.781095,
+        "completed": 70042,
+        "failed": 0,
+        "schedulerRejected": 0,
+        "outstanding": 8,
+        "memory": {
+          "rss": 109551616,
+          "heapTotal": 52015104,
+          "heapUsed": 12072728,
+          "external": 2629444,
+          "arrayBuffers": 241429
+        },
+        "cpu": {
+          "user": 8123421,
+          "system": 1947867
+        }
+      },
+      {
+        "elapsedMillis": 80055.299963,
+        "completed": 80046,
+        "failed": 0,
+        "schedulerRejected": 0,
+        "outstanding": 8,
+        "memory": {
+          "rss": 109584384,
+          "heapTotal": 50966528,
+          "heapUsed": 20188016,
+          "external": 3553854,
+          "arrayBuffers": 1170719
+        },
+        "cpu": {
+          "user": 9165046,
+          "system": 2240821
+        }
+      },
+      {
+        "elapsedMillis": 90067.007759,
+        "completed": 90058,
+        "failed": 0,
+        "schedulerRejected": 0,
+        "outstanding": 8,
+        "memory": {
+          "rss": 109690880,
+          "heapTotal": 50966528,
+          "heapUsed": 15945400,
+          "external": 3204258,
+          "arrayBuffers": 821123
+        },
+        "cpu": {
+          "user": 10238385,
+          "system": 2506930
+        }
+      },
+      {
+        "elapsedMillis": 100071.009627,
+        "completed": 100064,
+        "failed": 0,
+        "schedulerRejected": 0,
+        "outstanding": 7,
+        "memory": {
+          "rss": 109637632,
+          "heapTotal": 50966528,
+          "heapUsed": 19465600,
+          "external": 2850886,
+          "arrayBuffers": 467751
+        },
+        "cpu": {
+          "user": 11278811,
+          "system": 2771054
+        }
+      },
+      {
+        "elapsedMillis": 110082.12098800001,
+        "completed": 110074,
+        "failed": 0,
+        "schedulerRejected": 0,
+        "outstanding": 8,
+        "memory": {
+          "rss": 109228032,
+          "heapTotal": 51228672,
+          "heapUsed": 28006480,
+          "external": 3830558,
+          "arrayBuffers": 1447423
+        },
+        "cpu": {
+          "user": 12333802,
+          "system": 3047033
+        }
+      }
+    ]
+  },
+  "counterVerification": {
+    "expected": 14400,
+    "actual": 14400
+  },
+  "overload": null,
+  "recovery": null,
+  "recoverySkippedReason": "backend ownership changes under transaction pooling"
+}

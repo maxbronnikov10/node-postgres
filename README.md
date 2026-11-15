@@ -1,7 +1,23 @@
-# Tagged SQL for Node.js
+# PostgreSQL client for Node.js
 
-Экспериментальный TypeScript-форк node-postgres: компактный SQL API с параметрами,
-транзакциями и ограниченным pipelining. [Документация API](packages/pg/README.md).
+Экспериментальный TypeScript-форк node-postgres с параметрами, транзакциями и
+ограниченным pipelining. [Документация API](packages/pg/README.md).
+
+SQL-теги необязательны. Для множества одиночных запросов можно использовать обычный
+SQL с `$1`, `$2` и массивом значений:
+
+```ts
+import { QueryExecutor } from 'pg'
+
+const db = new QueryExecutor({ connectionString: process.env.DATABASE_URL, max: 4 })
+try {
+  const user = await db.maybeOne<{ id: number }>('SELECT id FROM users WHERE id = $1', [42])
+} finally {
+  await db.end()
+}
+```
+
+Теги удобны для композиции SQL и автоматической нумерации параметров:
 
 ```ts
 import postgres from 'pg'
@@ -28,3 +44,6 @@ MIT; исходная реализация и авторство node-postgres �
 
 [Результаты сравнения с Postgres.js](benchmark/sql-results-2026-11-15.md):
 PgBouncer unprepared и bytea имеют подтверждённые выигрыши; обычные prepared SELECT пока медленнее.
+
+[Нагрузочные проверки и оптимизация компилятора](benchmark/production-results-2026-11-15.md):
+смешанный поток, p95/p99, память, переполнение очередей и контроль Postgres.js с явными типами параметров.

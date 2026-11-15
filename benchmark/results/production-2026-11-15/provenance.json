@@ -1,0 +1,59 @@
+{
+  "runId": 43691904711,
+  "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43691904711",
+  "sourceCommit": "e3ab1025240b299d51e0d54ce46edc7abb5d76a8",
+  "sourceTree": "607e901d79cad4c58afed7693c398b0018bdc733",
+  "localSourceCommit": "08c0513d90a42875f9f1d1760950107880a98d57",
+  "baselineCommit": "b067b66df2a37c2e1af54d49ca22e046c8c60760",
+  "baselineTree": "673dfca8e41d0e518c73898ca156d4cc2d142cf1",
+  "jobs": [
+    {
+      "id": 132744139111,
+      "name": "load (2)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-15T07:52:50Z",
+      "completedAt": "2026-11-15T08:17:39Z"
+    },
+    {
+      "id": 132744139280,
+      "name": "load (3)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-15T07:52:51Z",
+      "completedAt": "2026-11-15T08:17:40Z"
+    },
+    {
+      "id": 132744139315,
+      "name": "load (1)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-15T07:52:51Z",
+      "completedAt": "2026-11-15T08:17:39Z"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 14153880617,
+      "name": "production-like-load-2",
+      "digest": "sha256:4e9b5e2fc5af1d6adc59e407242b25a0df7fc8f017f91b21bfaccbe1fdc0814b",
+      "sizeInBytes": 38080,
+      "digestVerified": true
+    },
+    {
+      "id": 14153631835,
+      "name": "production-like-load-3",
+      "digest": "sha256:0db7531ddfa617e7ee336b0371f1999551218326094d167b5f9c800b19d7250f",
+      "sizeInBytes": 38130,
+      "digestVerified": true
+    },
+    {
+      "id": 14153437294,
+      "name": "production-like-load-1",
+      "digest": "sha256:11a25c19df1a281ff5dda27bb9dd8c4f54e2454f655ced92512a4a06828fbfd4",
+      "sizeInBytes": 38030,
+      "digestVerified": true
+    }
+  ],
+  "downloadedAt": "2026-11-15T08:24:24.332Z"
+}

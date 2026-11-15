@@ -1,0 +1,18 @@
+{
+  "conclusion": "PASS",
+  "sourceCommit": "e3ab1025240b299d51e0d54ce46edc7abb5d76a8",
+  "workloadRows": 21,
+  "numericTableCells": 168,
+  "compilerTrials": 3,
+  "verified": [
+    "raw table metrics",
+    "operation and counter totals",
+    "compiler medians and noise",
+    "balanced actor order",
+    "CPU ratios",
+    "soak ranges",
+    "profile raw samples",
+    "CI count breakdown"
+  ],
+  "reviewScope": "separate read-only worker recomputed from raw data; not an external certification"
+}

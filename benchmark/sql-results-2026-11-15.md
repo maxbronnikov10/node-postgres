@@ -1,5 +1,8 @@
 # SQL API, PgBouncer и сравнение с Postgres.js 4.1.1
 
+Этот отчёт фиксирует предыдущий snapshot. Дополнительная оптимизация компилятора
+и новые нагрузочные проверки описаны в [следующем отчёте](production-results-2026-11-15.md).
+
 Ветка `feat/sql-tag-client` содержит компактный SQL API на strict TypeScript.
 Удалены `pg-native`, Cloudflare, cursor, query-stream и browser bundler package.
 Остались `pg` и три внутренних пакета: protocol, pool, connection-string.

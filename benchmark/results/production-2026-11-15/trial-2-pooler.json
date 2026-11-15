@@ -1,0 +1,9 @@
+{
+  "version": "PgBouncer 1.25.2\nlibevent 2.1.13-stable\nadns: c-ares 1.34.6\ntls: OpenSSL 3.5.9 29 Sep 2026",
+  "container": "nodepg-production-load",
+  "port": 6432,
+  "database": "nodepg_tls",
+  "poolMode": "transaction",
+  "maxPreparedStatements": 0,
+  "tls": "client require TLS1.3; backend verify-full TLS1.3"
+}

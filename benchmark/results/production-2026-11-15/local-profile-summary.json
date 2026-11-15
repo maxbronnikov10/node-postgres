@@ -1,0 +1,39 @@
+{
+  "before": {
+    "node": "v22.22.1",
+    "totalMicros": 20413700,
+    "compiler": [
+      {
+        "function": "flatten",
+        "line": 25,
+        "selfMicros": 810612,
+        "percentOfSamples": 3.9709214890000344
+      },
+      {
+        "function": "compile",
+        "line": 31,
+        "selfMicros": 345147,
+        "percentOfSamples": 1.6907615963789024
+      }
+    ],
+    "compilerSelfMicros": 1155759,
+    "compilerPercentOfSamples": 5.661683085378937,
+    "limitation": "separate local CPU profiles; not a controlled throughput estimate"
+  },
+  "after": {
+    "node": "v22.22.1",
+    "totalMicros": 20376686,
+    "compiler": [
+      {
+        "function": "compile",
+        "line": 25,
+        "selfMicros": 107019,
+        "percentOfSamples": 0.5252031660104102
+      }
+    ],
+    "compilerSelfMicros": 107019,
+    "compilerPercentOfSamples": 0.5252031660104102,
+    "limitation": "separate local CPU profiles; not a controlled throughput estimate"
+  },
+  "publication": "Raw CPU profiles retained locally; automatic approval review rejected publication because of private paths and environment metadata."
+}

@@ -1,0 +1,189 @@
+{
+  "driver": "query",
+  "driverVersion": "8.23.1",
+  "nodeVersion": "v22.22.1",
+  "fixtureRows": 100000,
+  "description": "isolated durable OLTP-like synthetic load; not evidence of production capacity",
+  "delayMillisPerDirection": 3,
+  "settings": {
+    "max": 4,
+    "depth": 16,
+    "maxPending": 256,
+    "applicationOutstandingCap": 1024,
+    "prepare": false,
+    "queryTimeoutMillis": 5000
+  },
+  "initial": {
+    "server": {
+      "version": "PostgreSQL 18.7 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "database": "nodepg_sql_test",
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on",
+      "server_version_num": "180007"
+    },
+    "connections": [
+      {
+        "pid": 238,
+        "application_name": "nodepg_load_2344088_query",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 239,
+        "application_name": "nodepg_load_2344088_query",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 240,
+        "application_name": "nodepg_load_2344088_query",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 241,
+        "application_name": "nodepg_load_2344088_query",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      }
+    ],
+    "connectionObservation": "server backends; not proof of frontend pool size behind a pooler"
+  },
+  "final": {
+    "server": {
+      "version": "PostgreSQL 18.7 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "database": "nodepg_sql_test",
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on",
+      "server_version_num": "180007"
+    },
+    "connections": [
+      {
+        "pid": 238,
+        "application_name": "nodepg_load_2344088_query",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 239,
+        "application_name": "nodepg_load_2344088_query",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 240,
+        "application_name": "nodepg_load_2344088_query",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      },
+      {
+        "pid": 241,
+        "application_name": "nodepg_load_2344088_query",
+        "ssl": true,
+        "tls_version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384"
+      }
+    ],
+    "connectionObservation": "server backends; not proof of frontend pool size behind a pooler"
+  },
+  "load": {
+    "offered": 300,
+    "offeredPerSecond": 100,
+    "offeredSeconds": 3,
+    "generationMillis": 2990.265891,
+    "drainMillis": 56.24620800000048,
+    "completedAtWindowEnd": 298,
+    "completed": 300,
+    "failed": 0,
+    "schedulerRejections": {
+      "count": 0,
+      "outcome": "not-sent",
+      "safeToRetry": true,
+      "latency": {
+        "count": 0,
+        "p50Millis": 0,
+        "p95Millis": 0,
+        "p99Millis": 0,
+        "maxMillis": 0
+      }
+    },
+    "errors": {},
+    "acknowledgedWrites": 24,
+    "acknowledgedTransactions": 6,
+    "successLatency": {
+      "count": 300,
+      "p50Millis": 10.231,
+      "p95Millis": 17.567,
+      "p99Millis": 43.199,
+      "maxMillis": 72.831
+    },
+    "failureLatency": {
+      "count": 0,
+      "p50Millis": 0,
+      "p95Millis": 0,
+      "p99Millis": 0,
+      "maxMillis": 0
+    },
+    "peakOutstanding": 4,
+    "diagnosticsAvailable": true,
+    "peakWaiting": 0,
+    "peakInFlight": 5,
+    "cpu": {
+      "user": 488308,
+      "system": 75272
+    },
+    "memory": {
+      "start": {
+        "rss": 79945728,
+        "heapTotal": 15745024,
+        "heapUsed": 6076528,
+        "external": 2069399,
+        "arrayBuffers": 25169
+      },
+      "peak": {
+        "rss": 85815296,
+        "heapUsed": 9691384
+      },
+      "end": {
+        "rss": 85815296,
+        "heapTotal": 15745024,
+        "heapUsed": 8504080,
+        "external": 2304771,
+        "arrayBuffers": 231376
+      },
+      "afterGC": {
+        "rss": 85815296,
+        "heapTotal": 15745024,
+        "heapUsed": 6373784,
+        "external": 2304771,
+        "arrayBuffers": 24860
+      }
+    },
+    "eventLoopP99Millis": 13.778943,
+    "samples": []
+  },
+  "counterVerification": {
+    "expected": 36,
+    "actual": 36
+  },
+  "overload": {
+    "offered": 512,
+    "rejected": 192,
+    "outcome": "not-sent",
+    "safeToRetry": true,
+    "recovered": true,
+    "peakWaiting": 256,
+    "peakInFlight": 64
+  },
+  "recovery": null,
+  "recoverySkippedReason": "backend ownership changes under transaction pooling"
+}

@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 1,
+  "profile": "sql-compile",
+  "comparison": {
+    "arms": {
+      "base": "pg.postgres before",
+      "base2": "pg.postgres before",
+      "head": "pg.postgres after",
+      "head2": "pg.postgres after"
+    },
+    "connections": 4,
+    "maxPipeline": 16,
+    "prepare": true,
+    "controlQualityLimit": 0.1
+  },
+  "actorMetadata": {
+    "base": {
+      "profile": "sql-compile",
+      "prepare": true,
+      "infer": null,
+      "parameterTypeHint": null,
+      "competitor": null,
+      "warmedConnections": [
+        {
+          "pid": 125,
+          "slept": "",
+          "app": "pg-bench-postgresjs-0",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 126,
+          "slept": "",
+          "app": "pg-bench-postgresjs-0",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 128,
+          "slept": "",
+          "app": "pg-bench-postgresjs-0",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 130,
+          "slept": "",
+          "app": "pg-bench-postgresjs-0",
+          "encrypted": false,
+          "tls_version": null
+        }
+      ],
+      "ssl": false,
+      "delayMillis": 0
+    },
+    "head": {
+      "profile": "sql-compile",
+      "prepare": true,
+      "infer": null,
+      "parameterTypeHint": null,
+      "competitor": null,
+      "warmedConnections": [
+        {
+          "pid": 124,
+          "slept": "",
+          "app": "pg-bench-postgresjs-1",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 127,
+          "slept": "",
+          "app": "pg-bench-postgresjs-1",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 129,
+          "slept": "",
+          "app": "pg-bench-postgresjs-1",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 123,
+          "slept": "",
+          "app": "pg-bench-postgresjs-1",
+          "encrypted": false,
+          "tls_version": null
+        }
+      ],
+      "ssl": false,
+      "delayMillis": 0
+    },
+    "base2": {
+      "profile": "sql-compile",
+      "prepare": true,
+      "infer": null,
+      "parameterTypeHint": null,
+      "competitor": null,
+      "warmedConnections": [
+        {
+          "pid": 132,
+          "slept": "",
+          "app": "pg-bench-postgresjs-2",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 131,
+          "slept": "",
+          "app": "pg-bench-postgresjs-2",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 134,
+          "slept": "",
+          "app": "pg-bench-postgresjs-2",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 133,
+          "slept": "",
+          "app": "pg-bench-postgresjs-2",
+          "encrypted": false,
+          "tls_version": null
+        }
+      ],
+      "ssl": false,
+      "delayMillis": 0
+    },
+    "head2": {
+      "profile": "sql-compile",
+      "prepare": true,
+      "infer": null,
+      "parameterTypeHint": null,
+      "competitor": null,
+      "warmedConnections": [
+        {
+          "pid": 135,
+          "slept": "",
+          "app": "pg-bench-postgresjs-3",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 136,
+          "slept": "",
+          "app": "pg-bench-postgresjs-3",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 137,
+          "slept": "",
+          "app": "pg-bench-postgresjs-3",
+          "encrypted": false,
+          "tls_version": null
+        },
+        {
+          "pid": 138,
+          "slept": "",
+          "app": "pg-bench-postgresjs-3",
+          "encrypted": false,
+          "tls_version": null
+        }
+      ],
+      "ssl": false,
+      "delayMillis": 0
+    }
+  },
+  "rounds": 8,
+  "durationSeconds": 3,
+  "warmupSeconds": 2,
+  "node": "v22.22.1",
+  "cpu": {
+    "model": "Intel(R) Xeon(R) 6975P-C",
+    "cores": 4
+  },
+  "checkouts": {
+    "base": {
+      "commit": "b067b66df2a37c2e1af54d49ca22e046c8c60760",
+      "tree": "673dfca8e41d0e518c73898ca156d4cc2d142cf1"
+    },
+    "head": {
+      "commit": "e3ab1025240b299d51e0d54ce46edc7abb5d76a8",
+      "tree": "607e901d79cad4c58afed7693c398b0018bdc733"
+    }
+  },
+  "rows": [
+    {
+      "name": "tagged point SELECT, concurrent x16",
+      "base": 38285.09721342067,
+      "head": 39618.530262585984,
+      "speedup": 1.0378119727761395,
+      "min": 1.018658407527857,
+      "max": 1.0423317487985009,
+      "noise": 0.022033160840247312,
+      "notable": true,
+      "samples": {
+        "base": [
+          38230.20007947058, 38048.70125907625, 38004.19210781435, 38210.35934464482, 38554.681664398726,
+          38339.994347370746, 38673.822807306926, 38563.03164737208
+        ],
+        "head": [
+          39634.07397241478, 39602.98655275719, 39565.39244281106, 39021.26918752554, 39274.05062699988,
+          39817.34605802241, 40108.27478354638, 40195.47221597728
+        ],
+        "base2": [
+          38550.98730903657, 38787.50423099631, 38505.18235606215, 38507.91555524886, 38952.66925169277,
+          39184.74560944054, 39321.17770473758, 39324.77649563762
+        ],
+        "head2": [
+          39954.70268907182, 39703.78802292364, 39366.76950083091, 39298.895465652015, 39884.07500817844,
+          39439.536611737836, 40034.03298103309, 39908.3523195194
+        ]
+      },
+      "orders": [
+        ["head", "base2", "head2", "base"],
+        ["base2", "head2", "base", "head"],
+        ["head2", "base", "head", "base2"],
+        ["base", "head", "base2", "head2"],
+        ["head", "base2", "head2", "base"],
+        ["base2", "head2", "base", "head"],
+        ["head2", "base", "head", "base2"],
+        ["base", "head", "base2", "head2"]
+      ]
+    }
+  ]
+}

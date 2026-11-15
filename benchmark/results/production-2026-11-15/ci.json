@@ -1,0 +1,74 @@
+{
+  "runId": 43691904665,
+  "url": "https://github.com/maxbronnikov10/node-postgres/actions/runs/43691904665",
+  "sourceCommit": "e3ab1025240b299d51e0d54ce46edc7abb5d76a8",
+  "sourceTree": "607e901d79cad4c58afed7693c398b0018bdc733",
+  "passingChecks": 1119,
+  "checksBreakdown": {
+    "suiteTicks": 1080,
+    "connectionStringTap": 13,
+    "esmTap": 26
+  },
+  "jobs": [
+    {
+      "id": 132744138957,
+      "name": "lint",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 132744282824,
+      "name": "Node.js 22 x PostgreSQL 18",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 132744282825,
+      "name": "Node.js 26 x PostgreSQL 17",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 132744282832,
+      "name": "Node.js 26 x PostgreSQL 16",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 132744282845,
+      "name": "Node.js 26 x PostgreSQL 18",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 132744282847,
+      "name": "Node.js 26 x PostgreSQL 13",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 132744282856,
+      "name": "Node.js 24 x PostgreSQL 18",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 132744282861,
+      "name": "Node.js 26 x PostgreSQL 15",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 132744282866,
+      "name": "Node.js 20 x PostgreSQL 18",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 132744282949,
+      "name": "Node.js 26 x PostgreSQL 14",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

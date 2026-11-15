@@ -1,0 +1,189 @@
+{
+  "driver": "tag",
+  "driverVersion": "8.23.1",
+  "nodeVersion": "v22.22.1",
+  "fixtureRows": 100000,
+  "description": "isolated durable OLTP-like synthetic load; not evidence of production capacity",
+  "delayMillisPerDirection": 3,
+  "settings": {
+    "max": 4,
+    "depth": 16,
+    "maxPending": 256,
+    "applicationOutstandingCap": 1024,
+    "prepare": true,
+    "queryTimeoutMillis": 5000
+  },
+  "initial": {
+    "server": {
+      "version": "PostgreSQL 18.7 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "database": "nodepg_load",
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on",
+      "server_version_num": "180007"
+    },
+    "connections": [
+      {
+        "pid": 167,
+        "application_name": "nodepg_load_2337583_tag",
+        "ssl": false,
+        "tls_version": null,
+        "cipher": null
+      },
+      {
+        "pid": 168,
+        "application_name": "nodepg_load_2337583_tag",
+        "ssl": false,
+        "tls_version": null,
+        "cipher": null
+      },
+      {
+        "pid": 169,
+        "application_name": "nodepg_load_2337583_tag",
+        "ssl": false,
+        "tls_version": null,
+        "cipher": null
+      },
+      {
+        "pid": 170,
+        "application_name": "nodepg_load_2337583_tag",
+        "ssl": false,
+        "tls_version": null,
+        "cipher": null
+      }
+    ],
+    "connectionObservation": "server backends; not proof of frontend pool size behind a pooler"
+  },
+  "final": {
+    "server": {
+      "version": "PostgreSQL 18.7 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "database": "nodepg_load",
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on",
+      "server_version_num": "180007"
+    },
+    "connections": [
+      {
+        "pid": 167,
+        "application_name": "nodepg_load_2337583_tag",
+        "ssl": false,
+        "tls_version": null,
+        "cipher": null
+      },
+      {
+        "pid": 168,
+        "application_name": "nodepg_load_2337583_tag",
+        "ssl": false,
+        "tls_version": null,
+        "cipher": null
+      },
+      {
+        "pid": 169,
+        "application_name": "nodepg_load_2337583_tag",
+        "ssl": false,
+        "tls_version": null,
+        "cipher": null
+      },
+      {
+        "pid": 170,
+        "application_name": "nodepg_load_2337583_tag",
+        "ssl": false,
+        "tls_version": null,
+        "cipher": null
+      }
+    ],
+    "connectionObservation": "server backends; not proof of frontend pool size behind a pooler"
+  },
+  "load": {
+    "offered": 100,
+    "offeredPerSecond": 50,
+    "offeredSeconds": 2,
+    "generationMillis": 1981.011405,
+    "drainMillis": 33.14784099999997,
+    "completedAtWindowEnd": 98,
+    "completed": 100,
+    "failed": 0,
+    "schedulerRejections": {
+      "count": 0,
+      "outcome": "not-sent",
+      "safeToRetry": true,
+      "latency": {
+        "count": 0,
+        "p50Millis": 0,
+        "p95Millis": 0,
+        "p99Millis": 0,
+        "maxMillis": 0
+      }
+    },
+    "errors": {},
+    "acknowledgedWrites": 8,
+    "acknowledgedTransactions": 2,
+    "successLatency": {
+      "count": 100,
+      "p50Millis": 9.279,
+      "p95Millis": 16.039,
+      "p99Millis": 33.887,
+      "maxMillis": 34.079
+    },
+    "failureLatency": {
+      "count": 0,
+      "p50Millis": 0,
+      "p95Millis": 0,
+      "p99Millis": 0,
+      "maxMillis": 0
+    },
+    "peakOutstanding": 2,
+    "diagnosticsAvailable": false,
+    "peakWaiting": null,
+    "peakInFlight": null,
+    "cpu": {
+      "user": 184469,
+      "system": 21509
+    },
+    "memory": {
+      "start": {
+        "rss": 77246464,
+        "heapTotal": 16007168,
+        "heapUsed": 6077744,
+        "external": 2091873,
+        "arrayBuffers": 25165
+      },
+      "peak": {
+        "rss": 79491072,
+        "heapUsed": 9235720
+      },
+      "end": {
+        "rss": 79491072,
+        "heapTotal": 16007168,
+        "heapUsed": 7761328,
+        "external": 2226850,
+        "arrayBuffers": 135144
+      },
+      "afterGC": {
+        "rss": 79622144,
+        "heapTotal": 16269312,
+        "heapUsed": 6255736,
+        "external": 2226850,
+        "arrayBuffers": 24860
+      }
+    },
+    "eventLoopP99Millis": 11.599871,
+    "samples": []
+  },
+  "counterVerification": {
+    "expected": 12,
+    "actual": 12
+  },
+  "overload": {
+    "offered": 512,
+    "rejected": 192,
+    "outcome": "not-sent",
+    "safeToRetry": true,
+    "recovered": true,
+    "peakWaiting": null,
+    "peakInFlight": null
+  },
+  "recovery": null,
+  "recoverySkippedReason": "dedicated QueryExecutor phase only"
+}
