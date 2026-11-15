@@ -5,6 +5,7 @@
   "main": "index.js",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./esm/index.mjs",
       "require": "./index.js",
       "default": "./index.js"
@@ -45,6 +46,8 @@
   },
   "files": [
     "index.js",
-    "esm"
-  ]
+    "esm",
+    "dist"
+  ],
+  "types": "dist/index.d.ts"
 }

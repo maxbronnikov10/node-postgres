@@ -130,6 +130,14 @@ const markdown = ({ labels, rows, rounds, duration, profile }) => {
       )
   } else if (profile === 'autocommit') {
     lines.push('Default options on both checkouts; independent queries without BEGIN. Pool max: 4; concurrency: 16.')
+  } else if (profile === 'executor-row-mode') {
+    lines.push(
+      'Same candidate checkout, rowMode object -> array. Base/base2: QueryExecutor object rows. Head/head2: QueryExecutor array rows. All arms: max 4, depth 16, maxPending 1024, maxAutoPrepare 16, identical result budgets, four warmed frontends and 16 concurrent queries. Only the 500-row SELECT runs; identical SQL and named preparation, every field of every row checked.'
+    )
+  } else if (profile === 'executor-int-parser') {
+    lines.push(
+      'Same candidate checkout. Base/base2: default int4 text parser. Head/head2: opt-in types override, text OID 23 -> Number; binary and every other OID delegate to pg.types.getTypeParser. All arms: QueryExecutor max 4, depth 16, maxPending 1024, maxAutoPrepare 16, identical result budgets, four warmed frontends, object rows and 16 concurrent queries. Only the 500-row SELECT with two int4 columns runs; identical SQL and named preparation, every field of every row checked. This measures canonical PostgreSQL int4 text in a bulk workload; it does not imply a general parsing improvement or a change to int8/numeric.'
+    )
   } else if (profile === 'executor-regression') {
     lines.push(
       'Before/after QueryExecutor on both arms: max 4, depth 16, maxPending 1024, maxAutoPrepare 16, target any. Four warmed frontends, checked results, no BEGIN. Actors run sequentially and update identical fixed keys.'
@@ -174,7 +182,7 @@ const main = async () => {
   const args = parseArgs(process.argv.slice(2))
   if (!args.base || !args.head) {
     throw new Error(
-      'usage: node benchmark/compare.js --base <dir> --head <dir> [--rounds 4] [--duration 3] [--output file] [--json-output file] [--scenario label] [--profile regression|ablation|queue|payload|autocommit|autocommit-prepare|autocommit-pipeline|tls-handshake|tls-steady|rows|row-formats|executor]'
+      'usage: node benchmark/compare.js --base <dir> --head <dir> [--rounds 4] [--duration 3] [--output file] [--json-output file] [--scenario label] [--profile regression|ablation|queue|payload|autocommit|autocommit-prepare|autocommit-pipeline|tls-handshake|tls-steady|rows|row-formats|executor|executor-regression|executor-row-mode|executor-int-parser]'
     )
   }
   const rounds = Number(args.rounds || 4)
@@ -196,6 +204,8 @@ const main = async () => {
       'row-formats',
       'executor',
       'executor-regression',
+      'executor-row-mode',
+      'executor-int-parser',
     ].includes(profile)
   ) {
     throw new Error(`unknown profile: ${profile}`)
@@ -204,9 +214,16 @@ const main = async () => {
   if (!Number.isFinite(duration) || duration <= 0) throw new Error('--duration must be positive')
   if (!Number.isFinite(warmup) || warmup <= 0) throw new Error('--warmup must be positive')
   if (
-    ['ablation', 'autocommit-prepare', 'autocommit-pipeline', 'tls-handshake', 'row-formats', 'executor'].includes(
-      profile
-    ) &&
+    [
+      'ablation',
+      'autocommit-prepare',
+      'autocommit-pipeline',
+      'tls-handshake',
+      'row-formats',
+      'executor',
+      'executor-row-mode',
+      'executor-int-parser',
+    ].includes(profile) &&
     fs.realpathSync(args.base) !== fs.realpathSync(args.head)
   ) {
     throw new Error(`--profile ${profile} requires --base and --head to name the same checkout`)
@@ -292,6 +309,34 @@ const main = async () => {
           {
             schemaVersion: 1,
             profile,
+            ...(profile === 'executor-row-mode'
+              ? {
+                  comparison: {
+                    option: 'rowMode',
+                    resource: 'QueryExecutor',
+                    arms: { base: 'object', base2: 'object', head: 'array', head2: 'array' },
+                    frontends: 4,
+                    depth: 16,
+                    concurrency: 16,
+                  },
+                }
+              : {}),
+            ...(profile === 'executor-int-parser'
+              ? {
+                  comparison: {
+                    option: 'types.getTypeParser',
+                    oid: 23,
+                    format: 'text',
+                    resource: 'QueryExecutor',
+                    arms: { base: 'default', base2: 'default', head: 'Number', head2: 'Number' },
+                    otherParsers: 'pg.types.getTypeParser',
+                    frontends: 4,
+                    depth: 16,
+                    concurrency: 16,
+                    rowMode: 'object',
+                  },
+                }
+              : {}),
             rounds,
             durationSeconds: duration,
             warmupSeconds: warmup,

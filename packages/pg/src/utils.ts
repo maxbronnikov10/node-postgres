@@ -1,0 +1,259 @@
+'use strict'
+
+import defaults = require('./defaults')
+import type { QueryConfig, QueryCallback, PgError } from './types'
+import nodeUtils = require('node:util')
+
+const { isDate, isProxy, isNativeError } = require('node:util/types') as typeof import('node:util/types')
+
+const invalidDateDeprecationNotice = nodeUtils.deprecate(
+  () => {},
+  'Sending an invalid date to Postgres is deprecated and will throw an error in the next major version of pg. Ensure any Date object passed as a query parameter is valid.',
+  'PG_INVALID_DATE'
+)
+
+function escapeElement(elementRepresentation: string) {
+  const escaped = elementRepresentation.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+
+  return '"' + escaped + '"'
+}
+
+// convert a JS array to a postgres array literal
+// uses comma separator so won't work for types like box that use
+// a different array separator.
+function arrayString(val: readonly unknown[]): string {
+  let result = '{'
+  for (let i = 0; i < val.length; i++) {
+    if (i > 0) {
+      result += ','
+    }
+    let item = val[i]
+    if (item == null) {
+      result += 'NULL'
+    } else if (Array.isArray(item)) {
+      result += arrayString(item)
+    } else if (ArrayBuffer.isView(item)) {
+      if (!(item instanceof Buffer)) {
+        item = Buffer.from(item.buffer, item.byteOffset, item.byteLength)
+      }
+      result += '\\\\x' + (item as Buffer).toString('hex')
+    } else {
+      result += escapeElement(prepareValue(item) as string)
+    }
+  }
+  result += '}'
+  return result
+}
+
+// converts values from javascript types
+// to their 'raw' counterparts for use as a postgres parameter
+// note: you can override this function to provide your own conversion mechanism
+// for complex types, etc...
+const prepareValue = function (val: unknown, seen?: object[]): string | Buffer | null | undefined {
+  // null and undefined are both null for postgres
+  if (val == null) {
+    return null
+  }
+  if (typeof val === 'object') {
+    if (val instanceof Buffer) {
+      return val
+    }
+    if (ArrayBuffer.isView(val)) {
+      return Buffer.from(val.buffer, val.byteOffset, val.byteLength)
+    }
+    if (isDate(val)) {
+      if (isNaN(val.getTime())) {
+        invalidDateDeprecationNotice()
+      }
+      if (defaults.parseInputDatesAsUTC) {
+        return dateToStringUTC(val)
+      } else {
+        return dateToString(val)
+      }
+    }
+    if (Array.isArray(val)) {
+      return arrayString(val)
+    }
+
+    return prepareObject(val, seen)
+  }
+  return val.toString()
+}
+
+function prepareObject(
+  val: object & { toPostgres?: (prepare: typeof prepareValue) => unknown },
+  seen?: object[]
+): string | Buffer | null | undefined {
+  if (val && typeof val.toPostgres === 'function') {
+    seen = seen || []
+    if (seen.indexOf(val) !== -1) {
+      throw new Error('circular reference detected while preparing "' + val + '" for query')
+    }
+    seen.push(val)
+
+    return prepareValue(val.toPostgres(prepareValue), seen)
+  }
+  return JSON.stringify(val)
+}
+
+function dateToString(date: Date) {
+  let offset = -date.getTimezoneOffset()
+
+  let year = date.getFullYear()
+  const isBCYear = year < 1
+  if (isBCYear) year = Math.abs(year) + 1 // negative years are 1 off their BC representation
+
+  let ret =
+    String(year).padStart(4, '0') +
+    '-' +
+    String(date.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(date.getDate()).padStart(2, '0') +
+    'T' +
+    String(date.getHours()).padStart(2, '0') +
+    ':' +
+    String(date.getMinutes()).padStart(2, '0') +
+    ':' +
+    String(date.getSeconds()).padStart(2, '0') +
+    '.' +
+    String(date.getMilliseconds()).padStart(3, '0')
+
+  if (offset < 0) {
+    ret += '-'
+    offset *= -1
+  } else {
+    ret += '+'
+  }
+
+  ret += String(Math.floor(offset / 60)).padStart(2, '0') + ':' + String(offset % 60).padStart(2, '0')
+  if (isBCYear) ret += ' BC'
+  return ret
+}
+
+function dateToStringUTC(date: Date) {
+  let year = date.getUTCFullYear()
+  const isBCYear = year < 1
+  if (isBCYear) year = Math.abs(year) + 1 // negative years are 1 off their BC representation
+
+  let ret =
+    String(year).padStart(4, '0') +
+    '-' +
+    String(date.getUTCMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(date.getUTCDate()).padStart(2, '0') +
+    'T' +
+    String(date.getUTCHours()).padStart(2, '0') +
+    ':' +
+    String(date.getUTCMinutes()).padStart(2, '0') +
+    ':' +
+    String(date.getUTCSeconds()).padStart(2, '0') +
+    '.' +
+    String(date.getUTCMilliseconds()).padStart(3, '0')
+
+  ret += '+00:00'
+  if (isBCYear) ret += ' BC'
+  return ret
+}
+
+function normalizeQueryConfig(
+  config: string | QueryConfig,
+  values?: readonly unknown[] | QueryCallback,
+  callback?: QueryCallback
+): QueryConfig {
+  // can take in strings or config objects
+  if (typeof config === 'string') {
+    config = { text: config }
+  } else if (values !== undefined || callback !== undefined || !isOrdinaryQueryConfig(config)) {
+    // Copy config before applying positional values/callback so normalization does not mutate the caller's object.
+    config = cloneQueryConfig(config)
+  }
+  if (values) {
+    if (typeof values === 'function') {
+      config.callback = values
+    } else {
+      config.values = values
+    }
+  }
+  if (callback) {
+    config.callback = callback
+  }
+  return config
+}
+
+function isOrdinaryQueryConfig(config: unknown) {
+  if (
+    config == null ||
+    typeof config !== 'object' ||
+    isProxy(config) ||
+    Object.getPrototypeOf(config) !== Object.prototype
+  ) {
+    return false
+  }
+
+  for (const key of Reflect.ownKeys(config)) {
+    const descriptor = Object.getOwnPropertyDescriptor(config, key)
+    if (!('value' in descriptor!) || !descriptor!.enumerable || !descriptor!.writable || !descriptor!.configurable) {
+      return false
+    }
+  }
+  return true
+}
+
+function cloneQueryConfig<T>(config: T): T {
+  if (config == null) {
+    return config
+  }
+  return Object.defineProperties(Object.create(Object.getPrototypeOf(config)), Object.getOwnPropertyDescriptors(config))
+}
+
+// Ported from PostgreSQL 9.2.4 source code in src/interfaces/libpq/fe-exec.c
+const escapeIdentifier = function (str: string) {
+  return '"' + str.replace(/"/g, '""') + '"'
+}
+
+const escapeLiteral = function (str: unknown) {
+  let hasBackslash = false
+  let escaped = "'"
+
+  if (str == null) {
+    return "''"
+  }
+
+  if (typeof str !== 'string') {
+    return "''"
+  }
+
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i]
+    if (c === "'") {
+      escaped += c + c
+    } else if (c === '\\') {
+      escaped += c + c
+      hasBackslash = true
+    } else {
+      escaped += c
+    }
+  }
+
+  escaped += "'"
+
+  if (hasBackslash === true) {
+    escaped = ' E' + escaped
+  }
+
+  return escaped
+}
+
+function toError(value: unknown): PgError {
+  if (value instanceof Error || isNativeError(value)) return value
+  const error = new Error('Query handler threw a non-Error value')
+  error.cause = value
+  return error
+}
+
+export { prepareValueWrapper as prepareValue, normalizeQueryConfig, toError, escapeIdentifier, escapeLiteral }
+
+function prepareValueWrapper(value: unknown) {
+  // Keep Array.map indices out of the recursion stack parameter.
+  return prepareValue(value)
+}

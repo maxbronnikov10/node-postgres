@@ -6,20 +6,30 @@ title: pg.QueryExecutor
 JavaScript clients. Connections open lazily. Each connection pipelines queries,
 with a separate protocol synchronization boundary for each statement.
 
-```js
+```ts
 import { QueryExecutor } from 'pg'
 
-const executor = new QueryExecutor({ max: 4, maxInFlightPerConnection: 16, maxPending: 1024 })
+interface User {
+  id: number
+  name: string
+}
+
+const executor = new QueryExecutor({ connectionString: process.env.DATABASE_URL })
 
 try {
-  const results = await Promise.all(
-    [1, 2, 3].map((id) => executor.query('SELECT id, name FROM users WHERE id = $1', [id]))
+  const users = await Promise.all(
+    [1, 2, 3].map((id) => executor.maybeOne<User>('SELECT id, name FROM users WHERE id = $1', [id]))
   )
-  console.log(results.map((result) => result.rows))
+  console.log(users)
 } finally {
   await executor.end()
 }
 ```
+
+Type declarations ship with the package for CommonJS and ESM. TypeScript checks
+your code against the row shape you supply. `Client`, `Pool`, `Query`, `Result`
+and the independent-query engine are implemented in strict TypeScript; JavaScript
+applications use the compiled runtime through the existing package entrypoints.
 
 This API is available from the CommonJS and ESM JavaScript exports, together with
 `QueryExecutorError`. It is not part of `pg.native`. Construction requires a runtime
@@ -155,6 +165,38 @@ including queries without parameters. An explicit `queryMode` must be `'extended
 Callbacks, custom Query objects, portals, `rows` pagination and per-query transport
 options are unsupported.
 
+### Getting rows directly
+
+All four methods accept SQL text with an optional readonly values array, or an
+independent-query config object. Each executes one statement once.
+
+| Method             | Return type          | Result cardinality                             |
+| ------------------ | -------------------- | ---------------------------------------------- |
+| `query<R>(...)`    | `Promise<Result<R>>` | Complete result, including fields and command. |
+| `rows<R>(...)`     | `Promise<R[]>`       | All rows; an empty result returns `[]`.        |
+| `one<R>(...)`      | `Promise<R>`         | Exactly one row is required.                   |
+| `maybeOne<R>(...)` | `Promise<R \| null>` | Zero rows returns `null`; one returns the row. |
+
+`one()` and `maybeOne()` reject unexpected row counts with
+`PG_EXECUTOR_ROW_COUNT`, outcome `'unknown'` and `safeToRetry: false`. The check
+happens after SQL completes. A write with RETURNING may already have committed;
+the helper never repeats it.
+
+```ts
+const user = await executor.one<User>('SELECT id, name FROM users WHERE id = $1', [42])
+const users = await executor.rows<User>('SELECT id, name FROM users WHERE active = $1', [true])
+
+const tuples = await executor.rows<[number, string]>({
+  text: 'SELECT id, name FROM users WHERE active = $1',
+  values: [true],
+  rowMode: 'array',
+})
+```
+
+Array mode changes rows into positional tuples. It can reduce object construction
+for bulk results; measure it with your column count and workload. PostgreSQL type
+parsers and the executor's result budgets apply to both row modes.
+
 Statements must be independent: no transaction control, session `SET`, temporary
 table workflows, session locks, COPY or cursors. Use an exclusively checked-out
 [Pool client](/apis/pool#poolconnect) for these workflows. SQL is not parsed to
@@ -198,7 +240,7 @@ Errors expose `code`, `outcome`, `safeToRetry` and the original `cause`, when pr
 Local errors use `PG_EXECUTOR_INVALID`, `PG_EXECUTOR_OVERLOADED`,
 `PG_EXECUTOR_UNAVAILABLE`, `PG_EXECUTOR_CLOSED`, `PG_EXECUTOR_DESTROYED`,
 `PG_EXECUTOR_ABORTED`, `PG_EXECUTOR_TIMEOUT`, `PG_EXECUTOR_TRANSACTION` or
-`PG_EXECUTOR_RESULT_LIMIT` or `PG_EXECUTOR_UNKNOWN`. Abort and timeout outcomes depend on whether assignment
+`PG_EXECUTOR_RESULT_LIMIT`, `PG_EXECUTOR_ROW_COUNT` or `PG_EXECUTOR_UNKNOWN`. Abort and timeout outcomes depend on whether assignment
 has occurred. Collateral failures use a generic transport error, not another
 query's abort reason.
 

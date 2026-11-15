@@ -12,6 +12,37 @@ Non-blocking PostgreSQL client for Node.js. Pure JavaScript and optional native 
 $ npm install pg
 ```
 
+### TypeScript in this fork
+
+These experimental APIs come from this fork or its coordinated package archives;
+the npm registry release is unchanged. The `pg` and `pg-pool` runtimes use strict
+TypeScript and ship declarations for CommonJS and ESM. Build the source checkout with `yarn build` before running it;
+package archives contain the compiled runtime.
+
+For concurrent independent statements, `QueryExecutor` provides bounded queues,
+deadlines and typed row helpers:
+
+```ts
+import { QueryExecutor } from 'pg'
+
+interface User {
+  id: number
+  name: string
+}
+const db = new QueryExecutor({ connectionString: process.env.DATABASE_URL })
+try {
+  const user = await db.maybeOne<User>('SELECT id, name FROM users WHERE id = $1', [42])
+  console.log(user?.name)
+} finally {
+  await db.end()
+}
+```
+
+`rows()` returns all rows, `one()` requires exactly one, and `maybeOne()` returns
+one or `null`. A cardinality error happens after execution and never retries SQL.
+Use an exclusively checked-out Pool client for transactions and session state.
+See the [API and limits](../../docs/pages/apis/query-executor.mdx).
+
 ---
 
 ## :star: [Documentation](https://node-postgres.com) :star:

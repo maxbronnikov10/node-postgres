@@ -1,2 +1,3 @@
 'use strict'
-module.exports = require('./client')
+
+module.exports = require('../../dist/native/index.js')

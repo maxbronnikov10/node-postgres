@@ -21,15 +21,27 @@
   "main": "./lib",
   "exports": {
     ".": {
-      "import": "./esm/index.mjs",
-      "require": "./lib/index.js",
+      "import": {
+        "types": "./esm/index.d.mts",
+        "default": "./esm/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./lib/index.js"
+      },
       "default": "./lib/index.js"
     },
     "./package.json": {
       "default": "./package.json"
     },
-    "./lib/*": "./lib/*.js",
-    "./lib/*.js": "./lib/*.js"
+    "./lib/*": {
+      "types": "./dist/*.d.ts",
+      "default": "./lib/*.js"
+    },
+    "./lib/*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./lib/*.js"
+    }
   },
   "dependencies": {
     "pg-connection-string": "^2.14.1",
@@ -61,15 +73,19 @@
     }
   },
   "scripts": {
-    "test": "make test-all"
+    "test": "make test-all",
+    "build": "tsc --build",
+    "test:types": "tsc -p tsconfig.types.json"
   },
   "files": [
     "lib",
+    "dist",
     "esm",
     "SPONSORS.md"
   ],
   "license": "MIT",
   "engines": {
     "node": ">= 16.0.0"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }

@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "lib": ["ES2022", "ESNext.Disposable"],
+    "types": ["node"],
+    "strict": true,
+    "useDefineForClassFields": false,
+    "esModuleInterop": true,
+    "declaration": true,
+    "incremental": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "pg": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

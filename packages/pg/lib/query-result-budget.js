@@ -1,3 +1,3 @@
 'use strict'
 
-module.exports = Symbol('queryResultBudget')
+module.exports = require('../dist/query-result-budget.js')
