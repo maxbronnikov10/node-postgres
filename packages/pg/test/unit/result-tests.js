@@ -287,6 +287,48 @@ for (const rowMode of ['object', 'array']) {
     )
   })
 
+  test(`raw text ${rowMode} parsers can replace a later parser through this within the same row`, () => {
+    const result = new Result(rowMode, {
+      getTypeParser: (oid) =>
+        oid === 23
+          ? function (value) {
+              assert.strictEqual(this, result._parsers)
+              this[1] = function (laterValue) {
+                assert.strictEqual(this, result._parsers)
+                return `changed:${laterValue}`
+              }
+              return Number(value)
+            }
+          : () => 'original',
+    })
+    result.addFields([
+      { name: 'first', dataTypeID: 23, format: 'text' },
+      { name: 'later', dataTypeID: 25, format: 'text' },
+    ])
+
+    const row = result.parseRawRow(rawRow(['42', 'value']))
+
+    assert.deepStrictEqual(row, rowMode === 'array' ? [42, 'changed:value'] : { first: 42, later: 'changed:value' })
+  })
+
+  test(`raw text ${rowMode} invokes a parser without reading its own call property`, () => {
+    const parser = function (value) {
+      assert.strictEqual(this, result._parsers)
+      return `parsed:${value}`
+    }
+    Object.defineProperty(parser, 'call', {
+      get() {
+        throw new Error('a parser call property is not part of parsing')
+      },
+    })
+    const result = new Result(rowMode, { getTypeParser: () => parser })
+    result.addFields([{ name: 'label', dataTypeID: 25, format: 'text' }])
+
+    const row = result.parseRawRow(rawRow(['value']))
+
+    assert.deepStrictEqual(row, rowMode === 'array' ? ['parsed:value'] : { label: 'parsed:value' })
+  })
+
   const boolCases = [
     { value: 't', expected: true, why: 'canonical true uses the builtin meaning' },
     { value: 'f', expected: false, why: 'canonical false uses the builtin meaning' },

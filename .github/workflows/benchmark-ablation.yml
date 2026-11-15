@@ -1,0 +1,71 @@
+name: Default SQL feature ablation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [perf/sql-default-throughput]
+    paths:
+      - 'packages/pg/src/**'
+      - 'packages/pg-protocol/src/**'
+      - 'packages/pg-pool/src/**'
+      - 'benchmark/*.js'
+      - 'scripts/**'
+      - '.github/workflows/benchmark-ablation.yml'
+      - '.github/workflows/benchmark-defaults.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ablation:
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2, 3]
+    services:
+      postgres:
+        image: postgres@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: nodepg_sql_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGDATABASE: nodepg_sql_test
+      TRIAL: ${{ matrix.trial }}
+      PG_BENCH_POSTGRESJS_MODULE: ${{ github.workspace }}/competitor/node_modules/postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.1
+          cache: yarn
+      - name: Build and pin competitor
+        run: |
+          echo "PGPORT=${{ job.services.postgres.ports[5432] }}" >> "$GITHUB_ENV"
+          yarn install --frozen-lockfile
+          yarn build
+          npm install --prefix competitor --ignore-scripts --no-audit --no-fund --save-exact postgres@4.1.1
+          mkdir -p results
+          cp competitor/package-lock.json results/competitor-lock.json
+          npm view postgres@4.1.1 version gitHead dist.integrity --json > results/competitor-registry.json
+      - name: Sequential feature ablations
+        run: node benchmark/ablate-defaults.js
+      - name: Summary
+        if: always()
+        run: cat results/ablation/*.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: default-ablation-${{ matrix.trial }}
+          path: results/
+          retention-days: 1
