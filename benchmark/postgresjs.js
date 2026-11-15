@@ -27,7 +27,7 @@ const createPostgresJsWorkload = async ({ pg, arm, profile = 'postgresjs' }) => 
   const infer = profile === 'postgresjs-unprepared-infer'
   const typedText = profile === 'postgresjs-unprepared-typed'
   const competitor = arm % 2 === 0 && profile !== 'sql-compile'
-  const expectedBackendCount = apiDefaults ? (competitor ? 10 : 4) : 4
+  const expectedBackendCount = apiDefaults ? (competitor ? 10 : 2) : 4
   const maxPipeline = apiDefaults && competitor ? 100 : BURST
   let sql
   let close

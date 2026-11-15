@@ -439,12 +439,12 @@ class ProductionBenchmark {
         this.proxy = await new DelayedProxy({ host: endpoint.host, port: endpoint.port, delayMillis }).start()
         Object.assign(endpoint, { host: '127.0.0.1', port: this.proxy.port })
       }
+      const defaultPool = driver === 'tag' && process.env.PG_BENCH_POOL_DEFAULTS === '1'
       this.connectionOptions = {
         ...tls,
         ...endpoint,
         application_name: this.applicationName,
-        max: 4,
-        maxInFlightPerConnection: 16,
+        ...(defaultPool ? {} : { max: 4, maxInFlightPerConnection: 16 }),
         maxPending: 256,
         query_timeout: 5000,
         maxAutoPrepare: process.env.PG_BENCH_PREPARE === '0' ? 0 : 256,
@@ -478,7 +478,7 @@ class ProductionBenchmark {
       await Promise.all(Array.from({ length: 80 }, () => Promise.resolve(this.target.sleep(0.01))))
       const initial = await this.metadata()
       if (process.env.PG_BENCH_POOLER !== '1')
-        assert.equal(initial.connections.length, 4, 'all four connections must be warm')
+        assert.equal(initial.connections.length, defaultPool ? 2 : 4, 'all expected connections must be warm')
       global.gc?.()
       const load = await new ProductionLoad({ target: this.target, rate, seconds }).run()
       const sum = Number(
@@ -501,7 +501,7 @@ class ProductionBenchmark {
         description: 'isolated durable OLTP-like synthetic load; not evidence of production capacity',
         delayMillisPerDirection: delayMillis,
         settings: {
-          max: 4,
+          max: defaultPool ? 2 : 4,
           depth: 16,
           maxPending: driver.startsWith('postgresjs') ? null : 256,
           applicationOutstandingCap: 1024,

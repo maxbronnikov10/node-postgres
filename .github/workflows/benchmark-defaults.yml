@@ -141,7 +141,8 @@ jobs:
             results/before-after.*
           retention-days: 1
       - name: Durable mixed load with default automatic decoding
-        if: matrix.pool == 'matched'
+        env:
+          PG_BENCH_POOL_DEFAULTS: ${{ matrix.pool == 'defaults' && '1' || '0' }}
         run: >-
           node --expose-gc benchmark/production-load.js --driver tag
           --seconds 600 --rate 1500 --output results/load.json > results/load.log

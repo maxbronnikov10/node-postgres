@@ -84,12 +84,13 @@ export class PendingQuery<R extends object = QueryResultRow> implements PromiseL
     private readonly fragment: SqlFragment
   ) {}
 
-  private compile(offset = 0): { text: string; values: readonly unknown[] } {
+  private compile(offset = 0): SqlQueryConfig {
     this.scope.assertOpen()
     const fragment = this.fragment
-    if (fragment.kind === 'unsafe') return { text: fragment.text, values: fragment.values }
+    if (fragment.kind === 'unsafe')
+      return { text: fragment.text, values: fragment.values, rowMode: this.rowMode, queryMode: 'extended' }
     if (offset === 0 && fragment.scalarText !== undefined) {
-      return { text: fragment.scalarText, values: fragment.values }
+      return { text: fragment.scalarText, values: fragment.values, rowMode: this.rowMode, queryMode: 'extended' }
     }
     const values: unknown[] = []
     let text = fragment.strings[0]
@@ -111,15 +112,14 @@ export class PendingQuery<R extends object = QueryResultRow> implements PromiseL
       }
       text += fragment.strings[i + 1]
     }
-    return { text, values }
+    return { text, values, rowMode: this.rowMode, queryMode: 'extended' }
   }
 
   execute(): Promise<SqlRows<R>> {
     if (!this.promise) {
       this.promise = new Promise<SqlRows<R>>((resolve, reject) => {
-        const { text, values } = this.compile()
         this.scope.run({
-          config: { text, values, rowMode: this.rowMode, queryMode: 'extended' },
+          config: this.compile(),
           resolve: (result) => {
             try {
               const rows = result.rows as SqlRows<R>
@@ -278,6 +278,7 @@ export default function postgres(url?: string | SqlOptions, options?: SqlOptions
   const { username, prepare, max_pipeline, ...executorOptions } = config
   const executor = new QueryExecutor({
     ...executorOptions,
+    max: executorOptions.max ?? 2,
     user: executorOptions.user ?? username,
     maxAutoPrepare: prepare === false ? 0 : executorOptions.maxAutoPrepare ?? 256,
     maxInFlightPerConnection: max_pipeline ?? executorOptions.maxInFlightPerConnection,
