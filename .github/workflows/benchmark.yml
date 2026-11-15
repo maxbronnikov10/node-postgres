@@ -4,10 +4,13 @@ on:
   workflow_dispatch:
   push:
     branches: [feat/sql-tag-client]
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.mdx'
-      - 'benchmark/results/**'
+    paths:
+      - 'packages/pg/src/**'
+      - 'packages/pg-protocol/src/**'
+      - 'packages/pg-pool/src/**'
+      - 'benchmark/*.js'
+      - '**/package.json'
+      - 'yarn.lock'
 
 permissions:
   contents: read
